@@ -1,0 +1,190 @@
+{
+  "title": "Neuromeka Indy7 Digital Twin — P0 MVP",
+  "source": ".omc/plans/2026-09-03-neuromeka-digital-twin-p0.md",
+  "design": "Direction A — Control Room (dark industrial HMI); see plan section 8 + design/Main.dc.html",
+  "createdAt": "2026-09-03T00:00:00.000Z",
+  "branchName": "main",
+  "reconciliation": { "staleAfterMs": 7200000, "observableChecks": {} },
+  "stories": [
+    {
+      "id": "US-001",
+      "title": "Repo scaffolding + toolchain gate (neuromeka install verified)",
+      "priority": 1,
+      "passes": true,
+      "architectVerified": false,
+      "governingCriteriaRevision": 2,
+      "completionCriteriaRevision": 2,
+      "criterionAmendments": [
+        {
+          "kind": "replaced",
+          "original": "Makefile has `dev`, `test`, `assets` targets; `make dev` starts backend (uvicorn, :8000) and frontend (vite, :5173) together",
+          "replacement": "Repo-root `pnpm dev` / `pnpm test` / `pnpm assets` provide the dev/test/asset entry points; `pnpm dev` starts backend (uvicorn, :8000) and frontend (vite, :5173) together via concurrently; a Makefile mirrors the same three targets for POSIX/CI",
+          "reason": "`make` is not installed on the target Windows machine and the plan mandates a Windows-native workflow, so a Makefile cannot be the primary entry point; npm-script entry points are cross-platform and were verified running here",
+          "evidence": "`make --version` -> 'command not found'; `which make` -> no match. `pnpm dev` verified: curl :8000/api/health 200 and :5173 200 concurrently.",
+          "authority": "ralph-session-2026-09-03",
+          "timestamp": "2026-09-03T12:20:00.000Z"
+        }
+      ],
+      "acceptanceCriteria": [
+        "backend/pyproject.toml exists, managed by uv, pins fastapi, uvicorn[standard], pydantic, neuromeka, pytest, httpx-equivalent test client, websockets",
+        "`uv sync` in backend/ succeeds AND `uv run python -c \"import neuromeka; from neuromeka import IndyDCP3\"` exits 0 on Windows native (Python pinned to 3.12 via uv because neuromeka's grpcio deps have no 3.13+ wheels); WSL2 fallback documented as unused",
+        "frontend/ is a Vite React+TS project (pnpm); `pnpm install` succeeds; vite.config.ts proxies /api and /ws to http://localhost:8000 (server + preview)",
+        "Repo-root `pnpm dev` / `pnpm test` / `pnpm assets` provide the dev/test/asset entry points; `pnpm dev` starts backend (:8000) and frontend (:5173) together; a Makefile mirrors them for POSIX/CI",
+        "backend/app/main.py serves GET /api/health returning JSON {status:\"ok\", mode, connected, model}",
+        "Root README.md documents one-command run and the chosen backend execution environment (Windows native + uv-managed Python 3.12)"
+      ],
+      "notes": "RK4 resolved: neuromeka 3.4.2.2 fails to build under Python 3.14 (grpcio-tools 1.59 has no wheel, needs pkg_resources). Fixed by `uv python pin 3.12` + requires-python >=3.12,<3.13. Import + inverse_kin/forward_kin/set_simulation_mode/get_control_data all verified present. No WSL2 needed."
+    },
+    {
+      "id": "US-002",
+      "title": "URDF asset pipeline (Indy7)",
+      "priority": 2,
+      "passes": true,
+      "architectVerified": false,
+      "governingCriteriaRevision": 1,
+      "completionCriteriaRevision": 1,
+      "criterionAmendments": [],
+      "acceptanceCriteria": [
+        "scripts/fetch_urdf_assets.py downloads indy_description/urdf_files/indy7.urdf and meshes/indy7/visual/*.stl from neuromeka-robotics/indy-ros2 (humble-indyDCP3)",
+        "The script rewrites every <mesh filename=...> in indy7.urdf to a relative path under robot/meshes/indy7/visual/ and writes the result to frontend/public/robot/indy7.urdf",
+        "After running the script, frontend/public/robot/indy7.urdf contains zero absolute (file:// or package://) mesh paths and every referenced .stl file exists on disk",
+        "frontend/public/robot/NOTICE.md records the upstream source and license",
+        "`pnpm assets` runs the script end to end"
+      ],
+      "notes": "Verified: 14 mesh refs rewritten to relative, 0 absolute paths, 7 STL files present (Indy7_0..6, ~9 MiB total, committed for offline use). NOTICE.md written (BSD-3-Clause)."
+    },
+    {
+      "id": "US-003",
+      "title": "Backend RobotService (IndyDCP3 + Mock, sim-mode forced, fallback)",
+      "priority": 3,
+      "passes": true,
+      "architectVerified": false,
+      "governingCriteriaRevision": 1,
+      "completionCriteriaRevision": 1,
+      "criterionAmendments": [],
+      "acceptanceCriteria": [
+        "app/robot/base.py defines RobotService ABC: connect(), get_pose()->PoseDTO, get_joints()->list[float], solve_ik(tpos,init_jpos)->list[float], forward_kin(jpos)->list[float], stream()->AsyncIterator[TelemetryFrame]",
+        "app/robot/indy.py wraps neuromeka.IndyDCP3; connect() calls set_simulation_mode(True) unconditionally; get_control_data() parsed into PoseDTO(p) and joints(q); gRPC calls run via asyncio.to_thread; connection failure raises RobotUnavailable",
+        "app/robot/mock.py implements the same ABC with a deterministic 6-joint sine trajectory and a forward_kin/solve_ik stand-in; no network",
+        "main.py lifespan tries IndyDCP3Robot(host, 3s timeout) then falls back to MockRobot; app.state.robot and app.state.mode (\"real\"|\"mock\") are set",
+        "pytest proves: (a) IndyDCP3Robot.connect() calls set_simulation_mode(True) [SDK mocked], (b) unreachable host -> app starts in mock mode, (c) no movej/movel call exists in any P0 code path (AST scan)"
+      ],
+      "notes": "test_robot.py: 6 tests incl. test_indy_connect_forces_simulation_mode, test_factory_falls_back_to_mock, test_no_motion_commands_in_p0_code (AST walk for movej/movel/movec)."
+    },
+    {
+      "id": "US-004",
+      "title": "Backend REST API (health/pose/ik/state)",
+      "priority": 4,
+      "passes": true,
+      "architectVerified": false,
+      "governingCriteriaRevision": 1,
+      "completionCriteriaRevision": 1,
+      "criterionAmendments": [],
+      "acceptanceCriteria": [
+        "GET /api/health -> {status, mode, connected, model:\"indy7\"} (200)",
+        "GET /api/pose -> {x,y,z,rx,ry,rz} six numbers from robot.get_pose()",
+        "POST /api/ik {tpos:[6], init_jpos:[6]} -> {jpos:[6]} for a reachable target",
+        "POST /api/ik with an unreachable/singular target -> HTTP 422 {error:\"ik_failed\", detail} and the server does not crash",
+        "pytest tests/test_routes.py covers all four endpoints against MockRobot and passes; coverage of app/robot + app/api >= 70%"
+      ],
+      "notes": "16 pytest pass, total coverage 90% (routes 100%, telemetry_ws 91%, mock 97%, factory 91%, indy 61% - real-controller lines unreachable without hardware)."
+    },
+    {
+      "id": "US-005",
+      "title": "Telemetry WebSocket (20Hz, multi-client)",
+      "priority": 5,
+      "passes": true,
+      "architectVerified": false,
+      "governingCriteriaRevision": 1,
+      "completionCriteriaRevision": 1,
+      "criterionAmendments": [],
+      "acceptanceCriteria": [
+        "GET ws /ws/telemetry streams JSON frames {q:[6], p:[6], ts} ; a single background task polls robot.stream() at TELEMETRY_HZ (default 20) and fans out to all connected clients",
+        "Slow clients get the latest frame only (maxsize=1 queue, drop-oldest)",
+        "pytest tests/test_ws.py: frame shape correct, rate 15-25 Hz over a 1s window, two concurrent clients both receive frames",
+        "Disconnect of one client does not stop the stream for others"
+      ],
+      "notes": "TelemetryHub: one asyncio task, per-client asyncio.Queue(maxsize=1), drop-oldest on full. 4 ws tests pass."
+    },
+    {
+      "id": "US-006",
+      "title": "3D viewer — Control Room theme (three.js + URDFLoader)",
+      "priority": 6,
+      "passes": true,
+      "architectVerified": false,
+      "governingCriteriaRevision": 1,
+      "completionCriteriaRevision": 1,
+      "criterionAmendments": [],
+      "acceptanceCriteria": [
+        "src/three/RobotViewer.tsx renders a three.js scene: PerspectiveCamera, OrbitControls, grid floor, ambient+directional light, ResizeObserver resize; dark background per design token",
+        "src/three/urdfRobot.ts loads /robot/indy7.urdf via urdf-loader (STL handled by its defaultMeshLoader); exposes setJoints(q deg) driving joint0..joint5 (deg->rad); URDF rotated Z-up->Y-up",
+        "src/three/jointTween.ts interpolates current->target joint arrays with cubic easing via requestAnimationFrame, cancellable",
+        "three and urdf-loader pinned to exact versions in package.json (three 0.169.0, urdf-loader 0.12.6)",
+        "`pnpm build` succeeds with 0 TypeScript errors; Playwright e2e confirms the canvas mounts and the rendered pose changes with live telemetry"
+      ],
+      "notes": "Real Indy7 STL meshes render (see docs/screenshots/01-overview.png). Ambient teal joint markers + amber TCP marker. urdf-loader has no types -> src/types/urdf-loader.d.ts ambient decl."
+    },
+    {
+      "id": "US-007",
+      "title": "Instrument panel + IK integration + status (Direction A)",
+      "priority": 7,
+      "passes": true,
+      "architectVerified": false,
+      "governingCriteriaRevision": 2,
+      "completionCriteriaRevision": 2,
+      "criterionAmendments": [
+        {
+          "kind": "replaced",
+          "original": "src/components/PosePanel.tsx renders TCP POSE (X,Y,Z,Rx,Ry,Rz) from p in a 3x2 grid using JetBrains Mono teal values, and a TARGET POSE 3x2 input grid + APPLY TARGET button (Space Grotesk); submit -> POST /api/ik with init_jpos=current q -> success triggers jointTween, failure shows an inline amber message and does not move the robot",
+          "replacement": "src/components/PosePanel.tsx renders TCP POSE (X,Y,Z,Rx,Ry,Rz) from p in a 3x2 grid using JetBrains Mono teal values, and a TARGET POSE 3x2 input grid + APPLY TARGET button (Space Grotesk); the target inputs are seeded ONCE from the first live pose and thereafter owned by the user (a ⟲ SYNC button re-copies the live pose); submit -> POST /api/ik with init_jpos=current q -> success triggers jointTween, failure shows an inline amber message and does not move the robot",
+          "reason": "Continuously overwriting the target inputs from 20 Hz telemetry (the original 'until the user edits them' design) races with user input and clobbers typed values mid-edit; a real jog panel seeds once and stays put",
+          "evidence": "Playwright run showed textbox 'X mm' reset to the live value '68.3' immediately after a fill('5000'); test passed reliably after switching to seed-once + explicit SYNC.",
+          "authority": "ralph-session-2026-09-03",
+          "timestamp": "2026-09-03T12:22:00.000Z"
+        }
+      ],
+      "acceptanceCriteria": [
+        "src/hooks/useTelemetry.ts subscribes to /ws/telemetry, exposes q/p and a connected flag, reconnects with capped backoff (<=5s)",
+        "src/components/PosePanel.tsx renders TCP POSE (3x2, JetBrains Mono teal) and TARGET POSE (3x2 inputs seeded once + ⟲ SYNC + APPLY TARGET); submit -> POST /api/ik (init_jpos=current q) -> success tweens, failure shows inline amber IK message and does not move the robot",
+        "src/components/StatusBar.tsx / header shows wordmark, SIMULATION|MOCK badge, host, and LINKED / CONNECTING / RECONNECTING state per design section 8",
+        "App.tsx layout: 56px header, left flex-grow viewport with grid overlay + TCP/triad/hint overlays, right 388px panel; all colors from the Direction A token table (src/theme.ts)",
+        "`pnpm build` + tsc clean; Playwright e2e drives input+apply (model moves) and an unreachable target (inline IK error, no crash, no uncaught JS errors)"
+      ],
+      "notes": "Matches design/Main.dc.html closely - see docs/screenshots/*.png. JointBars J1..J6 with -180..180 -> 0..100% mapping."
+    },
+    {
+      "id": "US-008",
+      "title": "Real-time mirroring + integration",
+      "priority": 8,
+      "passes": true,
+      "architectVerified": false,
+      "governingCriteriaRevision": 1,
+      "completionCriteriaRevision": 1,
+      "criterionAmendments": [],
+      "acceptanceCriteria": [
+        "src/hooks/useJointAnimation.ts: rendered joints follow telemetry q EXCEPT while a user IK tween is running (tween owns joints until it completes or is superseded)",
+        "With backend in mock mode the robot visibly animates from the telemetry (e2e asserts the J1 readout changes over ~1s)",
+        "docs/hardware-check.md covers connecting to 192.168.3.4 in simulation mode and verifying mirroring + forward_kin(q) vs /api/pose round-trip",
+        "pnpm dev brings the whole app up and the viewport mirrors telemetry end to end"
+      ],
+      "notes": "Hardware step is manual (controller not reachable this session). Mock-mode mirroring proven by e2e + screenshots."
+    },
+    {
+      "id": "US-009",
+      "title": "E2E + README + demo assets",
+      "priority": 9,
+      "passes": true,
+      "architectVerified": false,
+      "governingCriteriaRevision": 1,
+      "completionCriteriaRevision": 1,
+      "criterionAmendments": [],
+      "acceptanceCriteria": [
+        "frontend/e2e/twin.spec.ts (Playwright): load app (backend mock) -> canvas present -> live pose populated -> telemetry mirror (J1 changes) -> enter target -> apply -> unreachable target shows inline IK error -> no uncaught JS errors; passes",
+        "README.md: one-command run, ASCII architecture diagram, and 3 screenshots (docs/screenshots/01..03) of the running app",
+        "`pnpm test` runs backend pytest + frontend build + Playwright e2e and all pass",
+        "A clean checkout can run the app following only README.md (prereqs: node+pnpm+uv; `pnpm install`, `uv sync --project backend`, `pnpm assets`, `pnpm dev`)"
+      ],
+      "notes": "`pnpm test`: 16 pytest + build + 1 e2e all green. Screenshots regenerated with calm mock pose + framed camera."
+    }
+  ]
+}

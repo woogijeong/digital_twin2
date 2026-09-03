@@ -8,8 +8,10 @@ venv/
 .omc/state/
 .omc/logs/
 .omc/artifacts/
-frontend/public/robot/meshes/
 *.local
 .DS_Store
 test-results/
 playwright-report/
+backend/.omc/
+frontend/.omc/
+backend/.venv/

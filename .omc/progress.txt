@@ -1,0 +1,62 @@
+# Ralph progress — Neuromeka Indy7 Digital Twin (P0 MVP)
+
+Plan: .omc/plans/2026-09-03-neuromeka-digital-twin-p0.md
+PRD:  .omc/prd.json
+Design: Direction A "Control Room" (dark HMI) — plan section 8, design/Main.dc.html
+
+## Environment (this machine)
+- node v24.19.0, pnpm 11.24.0, npm 11.17.0
+- python 3.14.6 present BUT backend pinned to 3.12.13 via `uv python pin 3.12`
+  (neuromeka 3.4.2.2 -> grpcio-tools 1.59 has no 3.14 wheel / needs pkg_resources)
+- uv 0.11.33, git 2.54.0.windows; Windows 11, PowerShell primary
+- `make` NOT installed -> repo-root `pnpm dev|test|assets` are the entry points
+- No controller access from this session -> mock mode is the automated proof path
+
+## Status: ALL 9 STORIES PASS. Ready for Step 7 reviewer verification.
+
+## Iteration log
+
+### Iteration 1 (2026-09-03/04)
+- git init (branch main), first commit 57bb8b7 (PRD + design directions).
+- Wrote .omc/prd.json with 9 task-specific stories (US-001..US-009).
+- US-001 scaffolding + neuromeka gate:
+  - backend: uv project, Python 3.12 pin, FastAPI app (config, schemas, robot/, api/, main).
+  - RK4 resolved by pinning Python 3.12 (Windows native, no WSL2).
+  - frontend: Vite React-TS + three@0.169.0 + urdf-loader@0.12.6 (exact pins).
+  - root package.json: `dev` (concurrently api+web), `assets`, `test*`. Makefile mirrors.
+  - Criterion amendment recorded: Makefile -> pnpm scripts (make not installed).
+- US-002 asset pipeline: scripts/fetch_urdf_assets.py -> frontend/public/robot/
+  indy7.urdf (mesh paths rewritten relative) + 7 STL meshes + NOTICE.md. Verified 0 abs paths.
+- US-003 RobotService: base.py ABC, indy.py (forces set_simulation_mode(True),
+  asyncio.to_thread, RobotUnavailable), mock.py (deterministic sine + planar FK/IK stand-in),
+  factory.py (real -> mock fallback). tests: sim-mode gate, fallback, AST scan for movej/movel.
+- US-004 REST: /api/health /pose /state, POST /api/ik (422 on IkFailed). 16 pytest, 90% cov.
+- US-005 telemetry WS: TelemetryHub (1 task, per-client Queue(maxsize=1) drop-oldest). 4 ws tests.
+- US-006 3D viewer: RobotViewer.tsx (scene/camera/OrbitControls/grid/lights/resize),
+  urdfRobot.ts (URDFLoader, setJoints deg->rad, Z-up->Y-up), jointTween.ts (cubic, cancellable).
+  urdf-loader has no types -> src/types/urdf-loader.d.ts.
+- US-007 panel: StatusBar, PosePanel (TCP POSE 3x2 live + TARGET POSE seed-once + SYNC + APPLY),
+  JointBars, ViewportOverlays (TCP text, XYZ triad, hint). theme.ts = Direction A tokens.
+  Criterion amendment recorded: target inputs seed-once (20Hz clobber race found via Playwright).
+- US-008 mirroring: useJointAnimation (telemetry follow, tween wins during IK move).
+  docs/hardware-check.md manual checklist.
+- US-009 e2e: frontend/e2e/twin.spec.ts (load->mirror->apply->reject->no-JS-errors).
+  README.md (one-command run, ASCII arch, 3 screenshots in docs/screenshots/).
+- `pnpm test` green: 16 pytest + frontend build + 1 Playwright e2e.
+
+## Known facts / patterns
+- IndyDCP3 SDK: get_control_data()->{q[6] deg, p[6] [mm,mm,mm,deg,deg,deg]},
+  inverse_kin(tpos,init_jpos)->{jpos,response{code,msg}}, forward_kin(jpos)->{tpos},
+  set_simulation_mode(bool). movej/movel = P1 only, banned in P0 (AST test enforces).
+- pytest from repo root needs `uv run --directory backend pytest` (not --project) so
+  backend/pyproject.toml [tool.pytest.ini_options] asyncio_mode=auto is picked up.
+- uvicorn --reload triggers WinError 10013 on this box -> dev:api has no --reload
+  (dev:api:reload exists with --reload-dir backend/app for those who want it).
+- Playwright webServer reuseExistingServer:!CI can serve a STALE backend locally;
+  run e2e with CI=1 or kill :8000 first for accurate screenshots.
+- Euler angles: controller raw values passed through unchanged (plan decision 3).
+
+## Next
+- Step 7: architect reviewer against prd.json acceptance criteria.
+- Step 7.5: ai-slop-cleaner on changed files.
+- Step 7.6: regression re-run. Step 8: /oh-my-claudecode:cancel.
