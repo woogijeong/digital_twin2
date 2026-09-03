@@ -21,6 +21,12 @@ dev = [
     "httpx>=0.27",
 ]
 
+[tool.uv]
+# neuromeka hard-pins Pillow==9.5.0, which has no Linux cp312 wheel (only
+# Windows). We only touch PIL.Image via neuromeka's eager import, whose API is
+# stable, so allow a modern Pillow that ships manylinux wheels.
+override-dependencies = ["pillow>=10.4.0"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
