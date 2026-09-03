@@ -1,0 +1,125 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: 'Spline Sans Mono', ui-monospace, monospace; }
+    a { color: #82d4ff; } a:hover { color: #b6e6ff; }
+  </style>
+</helmet>
+
+<div style="width:1440px;height:900px;background:#0c2646;color:#cfe6f4;font-family:'Spline Sans Mono',ui-monospace,monospace;position:relative;overflow:hidden">
+
+  <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(130,212,255,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(130,212,255,.07) 1px,transparent 1px),linear-gradient(rgba(130,212,255,.15) 1px,transparent 1px),linear-gradient(90deg,rgba(130,212,255,.15) 1px,transparent 1px);background-size:28px 28px,28px 28px,140px 140px,140px 140px"></div>
+
+  <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) rotate(-19deg);font-family:'Saira Condensed',sans-serif;font-weight:700;font-size:168px;letter-spacing:.06em;color:rgba(130,212,255,.045);pointer-events:none;white-space:nowrap">SIMULATION</div>
+
+  <div style="position:absolute;inset:20px;border:1.5px solid rgba(130,212,255,.5)"></div>
+  <div style="position:absolute;inset:27px;border:1px solid rgba(130,212,255,.2)"></div>
+
+  <div style="position:absolute;left:46px;top:42px">
+    <div style="font-family:'Saira Condensed',sans-serif;font-weight:600;font-size:27px;letter-spacing:.07em;color:#eaf5fd">DIGITAL TWIN &mdash; KINEMATIC VIEW</div>
+    <div style="height:2px;width:236px;background:#82d4ff;margin-top:6px"></div>
+    <div style="margin-top:9px;font-size:11px;color:rgba(207,230,244,.6);letter-spacing:.12em">REAL-TIME MIRROR&nbsp;·&nbsp;IndyDCP3&nbsp;·&nbsp;FK + IK</div>
+  </div>
+
+  <svg width="760" height="620" viewBox="0 0 760 620" fill="none" xmlns="http://www.w3.org/2000/svg" style="position:absolute;left:340px;top:150px;font-family:'Spline Sans Mono',monospace">
+    <!-- coordinate axes from base origin (200,470) -->
+    <path d="M200 470 L200 120" stroke="#82d4ff" stroke-width="1.5"/>
+    <path d="M200 120 l-5 12 h10 z" fill="#82d4ff"/>
+    <text x="188" y="112" fill="#82d4ff" font-size="13">+Z</text>
+    <path d="M200 470 L560 470" stroke="#82d4ff" stroke-width="1.5"/>
+    <path d="M560 470 l-12 -5 v10 z" fill="#82d4ff"/>
+    <text x="566" y="475" fill="#82d4ff" font-size="13">+X</text>
+    <path d="M200 470 L108 526" stroke="#82d4ff" stroke-width="1.5" stroke-dasharray="5 4"/>
+    <path d="M108 526 l12 -1 l-5 -9 z" fill="#82d4ff"/>
+    <text x="86" y="544" fill="#82d4ff" font-size="13">+Y</text>
+    <!-- axis ticks on Z -->
+    <path d="M196 400 h8 M196 330 h8 M196 260 h8 M196 190 h8" stroke="rgba(130,212,255,.5)" stroke-width="1"/>
+
+    <!-- robot wireframe -->
+    <path d="M170 470 L184 402 L246 402 L260 470" stroke="#9fddff" stroke-width="2" fill="none"/>
+    <path d="M185 402 a30 8 0 0 0 60 0" stroke="#9fddff" stroke-width="1.2" fill="none"/>
+    <circle cx="215" cy="386" r="22" stroke="#9fddff" stroke-width="2" fill="#0c2646"/>
+    <path d="M215 386 L360 286" stroke="#9fddff" stroke-width="2"/>
+    <path d="M203 368 L348 268 M227 404 L372 304" stroke="rgba(159,221,255,.35)" stroke-width="1"/>
+    <circle cx="360" cy="286" r="18" stroke="#9fddff" stroke-width="2" fill="#0c2646"/>
+    <path d="M360 286 L349 150" stroke="#9fddff" stroke-width="2"/>
+    <path d="M345 288 L334 152 M375 284 L364 148" stroke="rgba(159,221,255,.35)" stroke-width="1"/>
+    <circle cx="349" cy="150" r="14" stroke="#9fddff" stroke-width="2" fill="#0c2646"/>
+    <path d="M349 150 L420 118" stroke="#9fddff" stroke-width="2"/>
+    <circle cx="420" cy="118" r="10" stroke="#9fddff" stroke-width="2" fill="#0c2646"/>
+    <path d="M420 118 L448 100 M420 118 L448 136" stroke="#9fddff" stroke-width="2"/>
+
+    <!-- TCP reticle -->
+    <circle cx="436" cy="118" r="12" stroke="#ff8a5c" stroke-width="1.5" fill="none"/>
+    <path d="M436 100 v36 M418 118 h36" stroke="#ff8a5c" stroke-width="1"/>
+    <path d="M452 106 L560 66" stroke="rgba(255,138,92,.7)" stroke-width="1"/>
+    <rect x="560" y="40" width="176" height="66" stroke="#ff8a5c" stroke-width="1" fill="rgba(255,138,92,.06)"/>
+    <text x="570" y="58" fill="#ff8a5c" font-size="11" letter-spacing="1">TCP  /  TOOL FRAME</text>
+    <text x="570" y="76" fill="#ffd9c8" font-size="11">X 350.2   Y -12.8   Z 521.6</text>
+    <text x="570" y="93" fill="#ffd9c8" font-size="11">Rx 178.4  Ry 1.2  Rz -90.0</text>
+
+    <!-- vertical dimension Z = 521.6 -->
+    <path d="M470 118 h150 M470 470 h150" stroke="rgba(130,212,255,.4)" stroke-width="1"/>
+    <path d="M612 118 L612 470" stroke="#82d4ff" stroke-width="1"/>
+    <path d="M612 118 l-4 10 h8 z M612 470 l-4 -10 h8 z" fill="#82d4ff"/>
+    <rect x="588" y="282" width="48" height="20" fill="#0c2646"/>
+    <text x="594" y="297" fill="#cfe6f4" font-size="12">521.6</text>
+
+    <!-- horizontal dimension X = 350.2 -->
+    <path d="M215 486 v40 M436 486 v40" stroke="rgba(130,212,255,.4)" stroke-width="1"/>
+    <path d="M215 512 L436 512" stroke="#82d4ff" stroke-width="1"/>
+    <path d="M215 512 l10 -4 v8 z M436 512 l-10 -4 v8 z" fill="#82d4ff"/>
+    <rect x="300" y="502" width="52" height="20" fill="#0c2646"/>
+    <text x="306" y="517" fill="#cfe6f4" font-size="12">350.2</text>
+
+    <!-- joint callouts -->
+    <path d="M215 470 L150 470" stroke="rgba(159,221,255,.5)" stroke-width="1"/><circle cx="215" cy="452" r="3" fill="#82d4ff"/>
+    <text x="70" y="474" fill="#9fddff" font-size="11">J1  0.0&deg;</text>
+    <path d="M193 386 L120 386" stroke="rgba(159,221,255,.5)" stroke-width="1"/>
+    <text x="46" y="390" fill="#9fddff" font-size="11">J2  -20.0&deg;</text>
+    <path d="M378 286 L470 286" stroke="rgba(159,221,255,.5)" stroke-width="1"/>
+    <text x="476" y="290" fill="#9fddff" font-size="11">J3  90.0&deg;</text>
+    <path d="M349 136 L470 136" stroke="rgba(159,221,255,.5)" stroke-width="1"/>
+    <text x="476" y="140" fill="#9fddff" font-size="11">J5  70.0&deg;</text>
+  </svg>
+
+  <div style="position:absolute;left:46px;top:300px;width:262px;border:1px solid rgba(130,212,255,.4)">
+    <div style="background:rgba(130,212,255,.12);padding:8px 11px;font-size:10.5px;letter-spacing:.16em;color:#bfe4f5">PARAMETERS &mdash; TARGET POSE</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 11px;border-top:1px solid rgba(130,212,255,.18);font-size:12px"><span style="color:rgba(207,230,244,.7)">X</span><span style="color:#eaf5fd">350.2 <span style="color:rgba(207,230,244,.45)">mm</span></span></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 11px;border-top:1px solid rgba(130,212,255,.18);font-size:12px"><span style="color:rgba(207,230,244,.7)">Y</span><span style="color:#eaf5fd">&minus;12.8 <span style="color:rgba(207,230,244,.45)">mm</span></span></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 11px;border-top:1px solid rgba(130,212,255,.18);font-size:12px"><span style="color:rgba(207,230,244,.7)">Z</span><span style="color:#eaf5fd">560.0 <span style="color:rgba(207,230,244,.45)">mm</span></span></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 11px;border-top:1px solid rgba(130,212,255,.18);font-size:12px"><span style="color:rgba(207,230,244,.7)">Rx</span><span style="color:#eaf5fd">178.4 <span style="color:rgba(207,230,244,.45)">deg</span></span></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 11px;border-top:1px solid rgba(130,212,255,.18);font-size:12px"><span style="color:rgba(207,230,244,.7)">Ry</span><span style="color:#eaf5fd">1.2 <span style="color:rgba(207,230,244,.45)">deg</span></span></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 11px;border-top:1px solid rgba(130,212,255,.18);font-size:12px"><span style="color:rgba(207,230,244,.7)">Rz</span><span style="color:#eaf5fd">&minus;90.0 <span style="color:rgba(207,230,244,.45)">deg</span></span></div>
+    <div style="border-top:1px solid rgba(130,212,255,.3);padding:9px 11px"><span style="display:inline-block;border:1px solid #82d4ff;color:#82d4ff;padding:6px 14px;font-size:11px;letter-spacing:.16em">&#9666; SOLVE / APPLY</span></div>
+  </div>
+
+  <div style="position:absolute;left:46px;top:590px;width:262px;font-size:11px;color:rgba(207,230,244,.65);line-height:1.7">
+    <div style="color:#9fddff;letter-spacing:.12em;margin-bottom:4px">JOINT STATE &mdash; deg</div>
+    J1 0.0 &nbsp; J2 &minus;20.0 &nbsp; J3 90.0<br>
+    J4 0.0 &nbsp; J5 70.0 &nbsp; J6 0.0
+  </div>
+
+  <div style="position:absolute;right:46px;bottom:42px;border:1px solid rgba(130,212,255,.5);font-size:10.5px;letter-spacing:.05em;color:#cfe6f4">
+    <div style="display:grid;grid-template-columns:96px 200px">
+      <div style="padding:6px 10px;border-bottom:1px solid rgba(130,212,255,.25);border-right:1px solid rgba(130,212,255,.25);color:rgba(207,230,244,.6)">PROJECT</div><div style="padding:6px 10px;border-bottom:1px solid rgba(130,212,255,.25)">NEUROMEKA IndyDCP3</div>
+      <div style="padding:6px 10px;border-bottom:1px solid rgba(130,212,255,.25);border-right:1px solid rgba(130,212,255,.25);color:rgba(207,230,244,.6)">MODEL</div><div style="padding:6px 10px;border-bottom:1px solid rgba(130,212,255,.25)">INDY7 &mdash; 6 DOF</div>
+      <div style="padding:6px 10px;border-bottom:1px solid rgba(130,212,255,.25);border-right:1px solid rgba(130,212,255,.25);color:rgba(207,230,244,.6)">MODE</div><div style="padding:6px 10px;border-bottom:1px solid rgba(130,212,255,.25)">SIMULATION</div>
+      <div style="padding:6px 10px;border-bottom:1px solid rgba(130,212,255,.25);border-right:1px solid rgba(130,212,255,.25);color:rgba(207,230,244,.6)">HOST</div><div style="padding:6px 10px;border-bottom:1px solid rgba(130,212,255,.25)">192.168.3.4</div>
+      <div style="padding:6px 10px;border-bottom:1px solid rgba(130,212,255,.25);border-right:1px solid rgba(130,212,255,.25);color:rgba(207,230,244,.6)">REV</div><div style="padding:6px 10px;border-bottom:1px solid rgba(130,212,255,.25)">0.1 &mdash; P0 MVP</div>
+      <div style="padding:6px 10px;border-right:1px solid rgba(130,212,255,.25);color:rgba(207,230,244,.6)">DATE</div><div style="padding:6px 10px">2026-09-03</div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

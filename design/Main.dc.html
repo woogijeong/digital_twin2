@@ -1,0 +1,120 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: 'IBM Plex Sans', system-ui, sans-serif; }
+    a { color: #46d6c0; } a:hover { color: #7fe9da; }
+  </style>
+</helmet>
+
+<div style="width:1440px;height:900px;background:#0d1012;color:#cdd6d9;font-family:'IBM Plex Sans',system-ui,sans-serif;display:flex;flex-direction:column;overflow:hidden">
+
+  <header style="height:56px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 24px;background:#12171a;border-bottom:1px solid #232c31">
+    <div style="display:flex;align-items:center;gap:12px">
+      <span style="width:8px;height:8px;border-radius:50%;background:#46d6c0;box-shadow:0 0 12px #46d6c0"></span>
+      <span style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:15px;letter-spacing:.14em">INDY7 · DIGITAL TWIN</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:14px;font-size:12px">
+      <span style="padding:5px 11px;border:1px solid #6a5326;color:#f2b03d;border-radius:999px;letter-spacing:.1em;font-family:'JetBrains Mono',monospace">SIMULATION</span>
+      <span style="font-family:'JetBrains Mono',monospace;color:#7c8a90">192.168.3.4</span>
+      <span style="display:flex;align-items:center;gap:6px;color:#4ade80"><span style="width:7px;height:7px;border-radius:50%;background:#4ade80"></span>LINKED</span>
+    </div>
+  </header>
+
+  <div style="flex:1;display:flex;min-height:0">
+
+    <div style="flex:1;position:relative;background:radial-gradient(circle at 44% 36%,#16201f,#0a0d0f 72%);overflow:hidden">
+      <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(70,214,192,.055) 1px,transparent 1px),linear-gradient(90deg,rgba(70,214,192,.055) 1px,transparent 1px);background-size:46px 46px"></div>
+
+      <div style="position:absolute;left:28px;top:24px;font-family:'JetBrains Mono',monospace;font-size:12px;color:#46d6c0;letter-spacing:.04em">
+        <span style="opacity:.55">TCP&nbsp;·&nbsp;</span>[ 350.2, &minus;12.8, 521.6 ] mm
+      </div>
+
+      <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center">
+        <svg width="520" height="520" viewBox="0 0 440 460" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <ellipse cx="176" cy="410" rx="122" ry="20" fill="rgba(70,214,192,.06)"/>
+          <path d="M120 402 L140 340 L212 340 L232 402 Z" fill="#2b3a40" stroke="#465559" stroke-width="1.5"/>
+          <ellipse cx="176" cy="340" rx="36" ry="9" fill="#3a4c52"/>
+          <rect x="150" y="298" width="52" height="48" rx="11" fill="#2f4046" stroke="#465559" stroke-width="1.5"/>
+          <circle cx="176" cy="314" r="22" fill="#46d6c0"/>
+          <path d="M176 314 L302 232" stroke="#3a4c52" stroke-width="44" stroke-linecap="round"/>
+          <path d="M176 314 L302 232" stroke="#33454b" stroke-width="36" stroke-linecap="round"/>
+          <circle cx="302" cy="232" r="19" fill="#46d6c0"/>
+          <path d="M302 232 L293 106" stroke="#3a4c52" stroke-width="32" stroke-linecap="round"/>
+          <path d="M302 232 L293 106" stroke="#33454b" stroke-width="24" stroke-linecap="round"/>
+          <circle cx="293" cy="106" r="14" fill="#46d6c0"/>
+          <path d="M293 106 L354 80" stroke="#3a4c52" stroke-width="20" stroke-linecap="round"/>
+          <circle cx="354" cy="80" r="10" fill="#46d6c0"/>
+          <path d="M354 80 L380 64 M354 80 L380 96" stroke="#8a9aa0" stroke-width="7" stroke-linecap="round"/>
+          <circle cx="368" cy="80" r="5" fill="#f2b03d"/>
+          <circle cx="368" cy="80" r="12" stroke="#f2b03d" stroke-width="1.5" opacity=".5"/>
+        </svg>
+      </div>
+
+      <div style="position:absolute;left:26px;bottom:22px">
+        <svg width="88" height="66" viewBox="0 0 88 66" fill="none" xmlns="http://www.w3.org/2000/svg" style="font-family:'JetBrains Mono',monospace">
+          <path d="M14 52 L74 52" stroke="#e0574b" stroke-width="2"/><path d="M74 52 l-7 -4 v8 z" fill="#e0574b"/><text x="78" y="55" fill="#e0574b" font-size="11">X</text>
+          <path d="M14 52 L14 10" stroke="#4ade80" stroke-width="2"/><path d="M14 10 l-4 7 h8 z" fill="#4ade80"/><text x="4" y="8" fill="#4ade80" font-size="11">Z</text>
+          <path d="M14 52 L40 40" stroke="#5b9bd5" stroke-width="2"/><path d="M40 40 l-8 0 l3 6 z" fill="#5b9bd5"/><text x="42" y="38" fill="#5b9bd5" font-size="11">Y</text>
+        </svg>
+      </div>
+
+      <div style="position:absolute;right:24px;bottom:20px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#5a666b;letter-spacing:.08em">DRAG&nbsp;·&nbsp;ORBIT&nbsp;&nbsp;SCROLL&nbsp;·&nbsp;ZOOM</div>
+    </div>
+
+    <aside style="width:388px;flex:none;background:#12171a;border-left:1px solid #232c31;display:flex;flex-direction:column;gap:22px;padding:22px 22px 18px;overflow:auto">
+
+      <section>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.2em;color:#7c8a90;margin-bottom:12px">TCP POSE&nbsp;&nbsp;/&nbsp;&nbsp;LIVE</div>
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 10px">
+          <div style="background:#0d1012;border:1px solid #232c31;border-radius:8px;padding:10px 11px"><div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:#7c8a90;letter-spacing:.12em">X · mm</div><div style="font-family:'JetBrains Mono',monospace;font-size:19px;color:#46d6c0;margin-top:4px">350.2</div></div>
+          <div style="background:#0d1012;border:1px solid #232c31;border-radius:8px;padding:10px 11px"><div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:#7c8a90;letter-spacing:.12em">Y · mm</div><div style="font-family:'JetBrains Mono',monospace;font-size:19px;color:#46d6c0;margin-top:4px">&minus;12.8</div></div>
+          <div style="background:#0d1012;border:1px solid #232c31;border-radius:8px;padding:10px 11px"><div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:#7c8a90;letter-spacing:.12em">Z · mm</div><div style="font-family:'JetBrains Mono',monospace;font-size:19px;color:#46d6c0;margin-top:4px">521.6</div></div>
+          <div style="background:#0d1012;border:1px solid #232c31;border-radius:8px;padding:10px 11px"><div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:#7c8a90;letter-spacing:.12em">Rx · deg</div><div style="font-family:'JetBrains Mono',monospace;font-size:19px;color:#46d6c0;margin-top:4px">178.4</div></div>
+          <div style="background:#0d1012;border:1px solid #232c31;border-radius:8px;padding:10px 11px"><div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:#7c8a90;letter-spacing:.12em">Ry · deg</div><div style="font-family:'JetBrains Mono',monospace;font-size:19px;color:#46d6c0;margin-top:4px">1.2</div></div>
+          <div style="background:#0d1012;border:1px solid #232c31;border-radius:8px;padding:10px 11px"><div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:#7c8a90;letter-spacing:.12em">Rz · deg</div><div style="font-family:'JetBrains Mono',monospace;font-size:19px;color:#46d6c0;margin-top:4px">&minus;90.0</div></div>
+        </div>
+      </section>
+
+      <section>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.2em;color:#7c8a90;margin-bottom:12px">TARGET POSE</div>
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px">
+          <label style="display:block"><span style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:#7c8a90;letter-spacing:.1em">X mm</span><input value="350.2" style="width:100%;margin-top:4px;background:#0d1012;border:1px solid #2b363b;border-radius:7px;padding:8px 9px;color:#cdd6d9;font-family:'JetBrains Mono',monospace;font-size:13px"></label>
+          <label style="display:block"><span style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:#7c8a90;letter-spacing:.1em">Y mm</span><input value="-12.8" style="width:100%;margin-top:4px;background:#0d1012;border:1px solid #2b363b;border-radius:7px;padding:8px 9px;color:#cdd6d9;font-family:'JetBrains Mono',monospace;font-size:13px"></label>
+          <label style="display:block"><span style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:#7c8a90;letter-spacing:.1em">Z mm</span><input value="560.0" style="width:100%;margin-top:4px;background:#0d1012;border:1px solid #2b363b;border-radius:7px;padding:8px 9px;color:#cdd6d9;font-family:'JetBrains Mono',monospace;font-size:13px"></label>
+          <label style="display:block"><span style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:#7c8a90;letter-spacing:.1em">Rx deg</span><input value="178.4" style="width:100%;margin-top:4px;background:#0d1012;border:1px solid #2b363b;border-radius:7px;padding:8px 9px;color:#cdd6d9;font-family:'JetBrains Mono',monospace;font-size:13px"></label>
+          <label style="display:block"><span style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:#7c8a90;letter-spacing:.1em">Ry deg</span><input value="1.2" style="width:100%;margin-top:4px;background:#0d1012;border:1px solid #2b363b;border-radius:7px;padding:8px 9px;color:#cdd6d9;font-family:'JetBrains Mono',monospace;font-size:13px"></label>
+          <label style="display:block"><span style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:#7c8a90;letter-spacing:.1em">Rz deg</span><input value="-90.0" style="width:100%;margin-top:4px;background:#0d1012;border:1px solid #2b363b;border-radius:7px;padding:8px 9px;color:#cdd6d9;font-family:'JetBrains Mono',monospace;font-size:13px"></label>
+        </div>
+        <button style="margin-top:12px;width:100%;padding:11px;background:#46d6c0;color:#08211f;border:none;border-radius:8px;font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:13px;letter-spacing:.14em;cursor:pointer">APPLY TARGET</button>
+      </section>
+
+      <section>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.2em;color:#7c8a90;margin-bottom:12px">JOINTS · deg</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;align-items:center;gap:10px"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#7c8a90;width:22px">J1</span><div style="flex:1;height:6px;border-radius:3px;background:#1c2327"><div style="width:50%;height:100%;background:#46d6c0;border-radius:3px"></div></div><span style="font-family:'JetBrains Mono',monospace;font-size:11px;width:54px;text-align:right">0.0</span></div>
+          <div style="display:flex;align-items:center;gap:10px"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#7c8a90;width:22px">J2</span><div style="flex:1;height:6px;border-radius:3px;background:#1c2327"><div style="width:44%;height:100%;background:#46d6c0;border-radius:3px"></div></div><span style="font-family:'JetBrains Mono',monospace;font-size:11px;width:54px;text-align:right">&minus;20.0</span></div>
+          <div style="display:flex;align-items:center;gap:10px"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#7c8a90;width:22px">J3</span><div style="flex:1;height:6px;border-radius:3px;background:#1c2327"><div style="width:75%;height:100%;background:#46d6c0;border-radius:3px"></div></div><span style="font-family:'JetBrains Mono',monospace;font-size:11px;width:54px;text-align:right">90.0</span></div>
+          <div style="display:flex;align-items:center;gap:10px"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#7c8a90;width:22px">J4</span><div style="flex:1;height:6px;border-radius:3px;background:#1c2327"><div style="width:50%;height:100%;background:#46d6c0;border-radius:3px"></div></div><span style="font-family:'JetBrains Mono',monospace;font-size:11px;width:54px;text-align:right">0.0</span></div>
+          <div style="display:flex;align-items:center;gap:10px"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#7c8a90;width:22px">J5</span><div style="flex:1;height:6px;border-radius:3px;background:#1c2327"><div style="width:69%;height:100%;background:#46d6c0;border-radius:3px"></div></div><span style="font-family:'JetBrains Mono',monospace;font-size:11px;width:54px;text-align:right">70.0</span></div>
+          <div style="display:flex;align-items:center;gap:10px"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#7c8a90;width:22px">J6</span><div style="flex:1;height:6px;border-radius:3px;background:#1c2327"><div style="width:50%;height:100%;background:#46d6c0;border-radius:3px"></div></div><span style="font-family:'JetBrains Mono',monospace;font-size:11px;width:54px;text-align:right">0.0</span></div>
+        </div>
+      </section>
+
+      <div style="margin-top:auto;display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:11px;color:#7c8a90;padding-top:12px;border-top:1px solid #232c31">
+        <span>manipulability 0.72</span><span>&Delta; 0.0 mm</span>
+      </div>
+    </aside>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>
