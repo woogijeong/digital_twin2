@@ -1,6 +1,5 @@
+import { fmt1 } from '../format'
 import { T } from '../theme'
-
-const fmt = (n: number) => (n < 0 ? '−' : '') + Math.abs(n).toFixed(1)
 
 interface Props {
   pose: number[] | null
@@ -23,7 +22,7 @@ export default function ViewportOverlays({ pose, stale }: Props) {
       >
         <span style={{ fontFamily: T.fontMono, fontSize: 12, color: T.teal }}>
           <span style={{ opacity: 0.55 }}>TCP · </span>
-          {pose ? `[ ${fmt(pose[0])}, ${fmt(pose[1])}, ${fmt(pose[2])} ] mm` : '[ … ]'}
+          {pose ? `[ ${fmt1(pose[0])}, ${fmt1(pose[1])}, ${fmt1(pose[2])} ] mm` : '[ … ]'}
         </span>
       </div>
 

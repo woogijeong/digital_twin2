@@ -5,6 +5,8 @@ __pycache__/
 .venv/
 venv/
 .pytest_cache/
+.coverage
+**/.coverage
 .omc/state/
 .omc/logs/
 .omc/artifacts/

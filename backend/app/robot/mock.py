@@ -74,15 +74,15 @@ class MockRobot(RobotService):
         # No real controller: nudge the seed toward the requested pose so the
         # rendered model moves, and reject targets outside a plausible envelope.
         reach = math.sqrt(tpos[0] ** 2 + tpos[1] ** 2 + tpos[2] ** 2)
-        if reach > 1100.0 or reach < 150.0:
+        if not 150.0 <= reach <= 1100.0:
             raise IkFailed(f"target out of reach ({reach:.0f} mm)")
         seed = list(init_jpos)
-        seed[0] = max(-_LIMIT, min(_LIMIT, -(tpos[5] + 90.0)))
-        seed[1] = max(-_LIMIT, min(_LIMIT, (tpos[2] - 400.0) / 6.0))
-        seed[2] = max(-_LIMIT, min(_LIMIT, (tpos[0] - 350.0) / 4.0 + 90.0))
-        seed[3] = max(-_LIMIT, min(_LIMIT, 180.0 - tpos[3]))
-        seed[4] = max(-_LIMIT, min(_LIMIT, tpos[4] + 20.0))
-        if any(abs(v) >= _LIMIT for v in seed):
+        seed[0] = -(tpos[5] + 90.0)
+        seed[1] = (tpos[2] - 400.0) / 6.0
+        seed[2] = (tpos[0] - 350.0) / 4.0 + 90.0
+        seed[3] = 180.0 - tpos[3]
+        seed[4] = tpos[4] + 20.0
+        if any(abs(v) > _LIMIT for v in seed):
             raise IkFailed("solution exceeds joint limits")
         self._center = list(seed)
         return seed

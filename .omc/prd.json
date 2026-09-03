@@ -4,14 +4,17 @@
   "design": "Direction A — Control Room (dark industrial HMI); see plan section 8 + design/Main.dc.html",
   "createdAt": "2026-09-03T00:00:00.000Z",
   "branchName": "main",
-  "reconciliation": { "staleAfterMs": 7200000, "observableChecks": {} },
+  "reconciliation": {
+    "staleAfterMs": 7200000,
+    "observableChecks": {}
+  },
   "stories": [
     {
       "id": "US-001",
       "title": "Repo scaffolding + toolchain gate (neuromeka install verified)",
       "priority": 1,
       "passes": true,
-      "architectVerified": false,
+      "architectVerified": true,
       "governingCriteriaRevision": 2,
       "completionCriteriaRevision": 2,
       "criterionAmendments": [
@@ -40,7 +43,7 @@
       "title": "URDF asset pipeline (Indy7)",
       "priority": 2,
       "passes": true,
-      "architectVerified": false,
+      "architectVerified": true,
       "governingCriteriaRevision": 1,
       "completionCriteriaRevision": 1,
       "criterionAmendments": [],
@@ -58,7 +61,7 @@
       "title": "Backend RobotService (IndyDCP3 + Mock, sim-mode forced, fallback)",
       "priority": 3,
       "passes": true,
-      "architectVerified": false,
+      "architectVerified": true,
       "governingCriteriaRevision": 1,
       "completionCriteriaRevision": 1,
       "criterionAmendments": [],
@@ -76,7 +79,7 @@
       "title": "Backend REST API (health/pose/ik/state)",
       "priority": 4,
       "passes": true,
-      "architectVerified": false,
+      "architectVerified": true,
       "governingCriteriaRevision": 1,
       "completionCriteriaRevision": 1,
       "criterionAmendments": [],
@@ -94,7 +97,7 @@
       "title": "Telemetry WebSocket (20Hz, multi-client)",
       "priority": 5,
       "passes": true,
-      "architectVerified": false,
+      "architectVerified": true,
       "governingCriteriaRevision": 1,
       "completionCriteriaRevision": 1,
       "criterionAmendments": [],
@@ -111,7 +114,7 @@
       "title": "3D viewer — Control Room theme (three.js + URDFLoader)",
       "priority": 6,
       "passes": true,
-      "architectVerified": false,
+      "architectVerified": true,
       "governingCriteriaRevision": 1,
       "completionCriteriaRevision": 1,
       "criterionAmendments": [],
@@ -129,7 +132,7 @@
       "title": "Instrument panel + IK integration + status (Direction A)",
       "priority": 7,
       "passes": true,
-      "architectVerified": false,
+      "architectVerified": true,
       "governingCriteriaRevision": 2,
       "completionCriteriaRevision": 2,
       "criterionAmendments": [
@@ -157,7 +160,7 @@
       "title": "Real-time mirroring + integration",
       "priority": 8,
       "passes": true,
-      "architectVerified": false,
+      "architectVerified": true,
       "governingCriteriaRevision": 1,
       "completionCriteriaRevision": 1,
       "criterionAmendments": [],
@@ -174,7 +177,7 @@
       "title": "E2E + README + demo assets",
       "priority": 9,
       "passes": true,
-      "architectVerified": false,
+      "architectVerified": true,
       "governingCriteriaRevision": 1,
       "completionCriteriaRevision": 1,
       "criterionAmendments": [],
@@ -186,5 +189,6 @@
       ],
       "notes": "`pnpm test`: 16 pytest + build + 1 e2e all green. Screenshots regenerated with calm mock pose + framed camera."
     }
-  ]
+  ],
+  "reviewStatus": "APPROVED by architect (opus) on re-review, commit 0e74650; deslop + regression green"
 }

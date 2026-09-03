@@ -6,15 +6,6 @@ export interface Health {
   host: string
 }
 
-export interface Pose {
-  x: number
-  y: number
-  z: number
-  rx: number
-  ry: number
-  rz: number
-}
-
 export type PoseTuple = [number, number, number, number, number, number]
 
 export class IkError extends Error {
@@ -29,12 +20,6 @@ export class IkError extends Error {
 export async function getHealth(): Promise<Health> {
   const r = await fetch('/api/health')
   if (!r.ok) throw new Error(`health ${r.status}`)
-  return r.json()
-}
-
-export async function getPose(): Promise<Pose> {
-  const r = await fetch('/api/pose')
-  if (!r.ok) throw new Error(`pose ${r.status}`)
   return r.json()
 }
 
@@ -56,5 +41,3 @@ export async function solveIk(
   const body = (await r.json()) as { jpos: number[] }
   return body.jpos
 }
-
-export const poseToTuple = (p: Pose): PoseTuple => [p.x, p.y, p.z, p.rx, p.ry, p.rz]

@@ -20,7 +20,7 @@ from app.schemas import PoseDTO, TelemetryFrame
 # these methods may pass -- so no code path (or future edit) can command the
 # physical robot, whatever string it hands to ``_call``.
 _ALLOWED_SDK_CALLS = frozenset(
-    {"get_control_data", "get_control_state", "inverse_kin", "forward_kin", "set_simulation_mode"}
+    {"get_control_data", "inverse_kin", "forward_kin", "set_simulation_mode"}
 )
 
 

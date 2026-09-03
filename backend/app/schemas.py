@@ -43,7 +43,6 @@ class IkResponse(BaseModel):
 class StateResponse(BaseModel):
     q: list[float]
     p: list[float]
-    manipulability: float | None = None
 
 
 class TelemetryFrame(BaseModel):

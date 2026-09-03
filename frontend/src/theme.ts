@@ -21,7 +21,6 @@ export const T = {
   viewportGrid: 'rgba(70,214,192,0.055)',
   viewportBg: 'radial-gradient(circle at 44% 36%, #16201f, #0a0d0f 72%)',
   fontDisplay: "'Space Grotesk', system-ui, sans-serif",
-  fontUi: "'IBM Plex Sans', system-ui, sans-serif",
   fontMono: "'JetBrains Mono', ui-monospace, monospace",
 } as const
 

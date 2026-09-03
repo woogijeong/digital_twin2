@@ -1,6 +1,7 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 import { AXIS_LABELS, AXIS_UNITS, T } from '../theme'
 import { IkError, solveIk, type PoseTuple } from '../api/client'
+import { fmt1 } from '../format'
 import { SectionHead } from './JointBars'
 
 interface Props {
@@ -60,7 +61,7 @@ export default function PosePanel({ pose, jointsDeg, stale, onApply }: Props) {
               <div style={cellLabel}>
                 {label} · {AXIS_UNITS[i]}
               </div>
-              <div style={cellValue}>{pose ? fmt(pose[i]) : '—'}</div>
+              <div style={cellValue}>{pose ? fmt1(pose[i]) : '—'}</div>
             </div>
           ))}
         </div>
@@ -107,8 +108,6 @@ export default function PosePanel({ pose, jointsDeg, stale, onApply }: Props) {
     </>
   )
 }
-
-const fmt = (n: number) => (n < 0 ? '−' : '') + Math.abs(n).toFixed(1)
 
 const grid3: CSSProperties = {
   display: 'grid',

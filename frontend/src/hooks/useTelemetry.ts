@@ -63,7 +63,9 @@ export function useTelemetry(): Telemetry {
 
     connect()
 
-    // Staleness watchdog: socket looks fine but frames dried up.
+    // Staleness watchdog: socket looks fine but frames dried up (incl. a
+    // half-open TCP connection that never sends a FIN). Force a close so the
+    // onclose backoff path actually reconnects.
     const watchdog = setInterval(() => {
       if (
         ws?.readyState === WebSocket.OPEN &&
@@ -71,6 +73,7 @@ export function useTelemetry(): Telemetry {
         Date.now() - lastFrameAt.current > STALE_AFTER_MS
       ) {
         setLink('reconnecting')
+        ws.close()
       }
     }, 500)
 

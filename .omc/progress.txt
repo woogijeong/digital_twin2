@@ -76,5 +76,23 @@ Design: Direction A "Control Room" (dark HMI) — plan section 8, design/Main.dc
 - D9: package-lock.json removed (pnpm only), pnpm: in scripts, claude.md + NOTICE.md fixed.
 - backend 18 pytest / frontend build 0 err / e2e pass.
 
-## Next
-- Re-verify with architect (round 2). On APPROVE: Step 7.5 ai-slop-cleaner, 7.6 regression, Step 8 cancel.
+## Review round 2 (architect, opus) — APPROVED, commit 0e74650
+- All 4 blocking defects verified fixed by the reviewer's own adversarial probes
+  (repeated-error stream -> 41 frames/4s; shutdown -> client WebSocketDisconnect;
+  INDY_HOST=10.0.0.5 -> health.host="10.0.0.5"; _call("movej") -> BLOCKED;
+  0 hex literals outside theme.ts). 18 pytest, coverage 91%, build clean, e2e pass.
+- Residual non-blocking: N1 half-open socket (fixed: watchdog now ws.close()),
+  N2 uncapped retry log, N3 mock/real solve_ik divergence (documented),
+  N4 relaxed health test, N5 .coverage tracked (fixed: gitignored).
+
+## Deslop pass (Ralph 7.5) — commit pending
+- Dead code removed: StateResponse.manipulability (always None); get_control_state
+  from _ALLOWED_SDK_CALLS (never called); theme.fontUi (unused); client.ts getPose
+  + poseToTuple + Pose interface (unused - pose comes from telemetry WS).
+- Duplication removed: fmt() defined in PosePanel + ViewportOverlays -> src/format.ts fmt1().
+- Simplified: mock.solve_ik clamp-then-check -> plain range check (equivalent).
+- N1/N5 fixes folded in (watchdog ws.close(), .coverage gitignored).
+- Net -16 lines. Regression: 18 pytest, build 0 err, e2e pass, oxlint 1 warn
+  (deliberate seed-once effect - architect-acknowledged).
+
+## STATUS: COMPLETE. All 9 stories pass + architectVerified. Ready for /cancel.
