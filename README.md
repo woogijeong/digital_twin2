@@ -54,7 +54,8 @@ Design direction: **"Control Room"** — a dark industrial HMI (see
 pnpm install
 pnpm --dir frontend install
 uv sync --project backend
-pnpm assets            # download the Indy7 URDF + meshes into frontend/public/robot/
+# pnpm assets          # optional — the Indy7 URDF + meshes are already committed;
+                       # re-run only to refresh them from upstream
 
 # run backend (:8000) + frontend (:5173) together
 pnpm dev               # -> open http://localhost:5173
