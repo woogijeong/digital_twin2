@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/woogijeong/digital_twin2/actions/workflows/ci.yml/badge.svg)](https://github.com/woogijeong/digital_twin2/actions/workflows/ci.yml)
 [![Python 3.12](https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white)](backend/pyproject.toml)
-[![Node ≥20](https://img.shields.io/badge/node-%E2%89%A520-339933?logo=nodedotjs&logoColor=white)](package.json)
+[![Node ≥22](https://img.shields.io/badge/node-%E2%89%A522-339933?logo=nodedotjs&logoColor=white)](package.json)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](backend/app/main.py)
 [![React 19](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](frontend/package.json)
 [![three.js](https://img.shields.io/badge/three.js-r169-000000?logo=threedotjs&logoColor=white)](frontend/src/three)
@@ -61,7 +61,7 @@ Design direction: **"Control Room"** — a dark industrial HMI (see
 
 ## Prerequisites
 
-- **Node ≥ 20** and **pnpm** (`npm i -g pnpm`)
+- **Node ≥ 22** and **pnpm 11** (`npm i -g pnpm`)
 - **[uv](https://docs.astral.sh/uv/)** — manages the Python 3.12 backend env
   (Python 3.12 is pinned because the `neuromeka` SDK's gRPC dependencies have no
   wheels for 3.13+; `uv` downloads 3.12 automatically)
