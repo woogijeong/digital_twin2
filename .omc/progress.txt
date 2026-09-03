@@ -56,7 +56,25 @@ Design: Direction A "Control Room" (dark HMI) — plan section 8, design/Main.dc
   run e2e with CI=1 or kill :8000 first for accurate screenshots.
 - Euler angles: controller raw values passed through unchanged (plan decision 3).
 
+## Review round 1 (architect, opus) — REJECTED narrowly, commit 78e16bc
+- D1 HIGH: telemetry hub exited loop on any stream error -> UI frozen at LINKED forever.
+- D2 MED: header host hardcoded '192.168.3.4', gated on model name; lies under INDY_HOST override.
+- D3 MED: no-motion AST scan can't see getattr(self._indy, name) dynamic dispatch -> vacuous.
+- D4 LOW(blocking): 7 hardcoded hexes outside theme.ts (US-007 c4 literal fail).
+- D5-D9 non-blocking: three.js geometry not disposed; jointTween cancel contract false;
+  dead _offset; weak e2e asserts; package-lock.json stray + claude.md stale ref.
+
+## Review round 1 fixes — commit 0e74650
+- D1: hub retry-with-backoff + _STOP sentinel closes sockets; client staleness watchdog
+  (1.5s) -> 'reconnecting'; stale dims PosePanel + ViewportOverlays. New ws regression test.
+- D2: /api/health exposes host; StatusBar shows real host + "(not dialled)" in mock.
+- D3: _ALLOWED_SDK_CALLS frozenset in _call() + test that _call("movej") raises; AST scan
+  extended to ast.Constant strings.
+- D4: axis/badge/hint/onTeal tokens in theme.ts.
+- D5: dispose STL geo+mats, tcpMarker, grid. D6: jointTween reject hoisted. D7: _center
+  re-set by solve_ik (mock target sticks). D8: e2e asserts joints moved >3deg to solution.
+- D9: package-lock.json removed (pnpm only), pnpm: in scripts, claude.md + NOTICE.md fixed.
+- backend 18 pytest / frontend build 0 err / e2e pass.
+
 ## Next
-- Step 7: architect reviewer against prd.json acceptance criteria.
-- Step 7.5: ai-slop-cleaner on changed files.
-- Step 7.6: regression re-run. Step 8: /oh-my-claudecode:cancel.
+- Re-verify with architect (round 2). On APPROVE: Step 7.5 ai-slop-cleaner, 7.6 regression, Step 8 cancel.
