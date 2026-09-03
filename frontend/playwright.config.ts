@@ -4,6 +4,7 @@ import { defineConfig, devices } from '@playwright/test'
  *  Both servers are started by the webServer blocks below. */
 export default defineConfig({
   testDir: './e2e',
+  testIgnore: '**/demo.spec.ts', // recording-only; run via `pnpm demo:gif`
   timeout: 30_000,
   fullyParallel: false,
   retries: 0,

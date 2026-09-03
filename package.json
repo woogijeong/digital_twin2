@@ -12,7 +12,8 @@
     "test": "pnpm run test:api && pnpm run test:web && pnpm run test:e2e",
     "test:api": "uv run --directory backend pytest -q",
     "test:web": "pnpm --dir frontend build",
-    "test:e2e": "pnpm --dir frontend exec playwright test"
+    "test:e2e": "pnpm --dir frontend exec playwright test",
+    "demo:gif": "node scripts/make-demo-gif.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"

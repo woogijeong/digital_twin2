@@ -1,5 +1,13 @@
 # Indy7 Digital Twin — P0 MVP
 
+[![CI](https://github.com/woogijeong/digital_twin2/actions/workflows/ci.yml/badge.svg)](https://github.com/woogijeong/digital_twin2/actions/workflows/ci.yml)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white)](backend/pyproject.toml)
+[![Node ≥20](https://img.shields.io/badge/node-%E2%89%A520-339933?logo=nodedotjs&logoColor=white)](package.json)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](backend/app/main.py)
+[![React 19](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](frontend/package.json)
+[![three.js](https://img.shields.io/badge/three.js-r169-000000?logo=threedotjs&logoColor=white)](frontend/src/three)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A browser-based digital twin of the Neuromeka **Indy7** collaborative robot.
 Loads the real `indy_description` URDF into a three.js viewport, shows the live
 TCP pose (X, Y, Z, Rx, Ry, Rz), and lets you type a target pose that the
@@ -8,11 +16,22 @@ controller solves with inverse kinematics and the model animates to.
 Design direction: **"Control Room"** — a dark industrial HMI (see
 `.omc/plans/2026-09-03-neuromeka-digital-twin-p0.md` §8).
 
+![Live demo](docs/demo.gif)
+
+> Orbit the model, drive it to two target poses (IK solved on the controller),
+> then an unreachable target is rejected inline. Mock mode — no controller
+> attached. Regenerate with `pnpm demo:gif`.
+
+<details>
+<summary>Static screenshots</summary>
+
 ![Overview](docs/screenshots/01-overview.png)
 
 | Target applied (IK solved) | Unreachable target rejected |
 | --- | --- |
 | ![Apply](docs/screenshots/02-target-applied.png) | ![Reject](docs/screenshots/03-ik-rejected.png) |
+
+</details>
 
 ## Architecture
 
@@ -83,9 +102,11 @@ Environment variables (prefix `INDY_`), or a `backend/.env` file:
 pnpm test          # backend pytest + frontend build + Playwright e2e
 pnpm test:api      # pytest only  (backend/)
 pnpm test:e2e      # Playwright only (frontend/, mock backend, writes screenshots)
+pnpm demo:gif      # record e2e/demo.spec.ts and rebuild docs/demo.gif (needs ffmpeg)
 ```
 
 `pnpm --dir frontend exec playwright install chromium` once before the first e2e run.
+CI (`.github/workflows/ci.yml`) runs `test:api` + `test:web` + `test:e2e` on every push.
 
 ## Connecting to the real controller
 
@@ -97,7 +118,14 @@ See [`docs/hardware-check.md`](docs/hardware-check.md) for the manual checklist
 ```
 backend/    FastAPI app — app/robot (services), app/api (REST + WS), tests/
 frontend/   Vite React app — src/three (viewer), src/components, src/hooks, e2e/
-scripts/    fetch_urdf_assets.py — URDF + mesh downloader / path rewriter
-docs/       PRD, hardware checklist
+scripts/    fetch_urdf_assets.py, make-demo-gif.mjs
+docs/       PRD, hardware checklist, screenshots, demo.gif
 design/     Direction A/B/C design mockups (design canvas)
 ```
+
+## License
+
+[MIT](LICENSE) for this project's code. The bundled Indy7 URDF + STL meshes
+(`frontend/public/robot/`) are from
+[neuromeka-robotics/indy-ros2](https://github.com/neuromeka-robotics/indy-ros2),
+BSD-3-Clause — see [`frontend/public/robot/NOTICE.md`](frontend/public/robot/NOTICE.md).
