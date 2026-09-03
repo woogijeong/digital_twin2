@@ -49,7 +49,7 @@ export default function StatusBar({ health, link }: Props) {
         <span
           style={{
             padding: '5px 11px',
-            border: `1px solid ${mock ? '#5a6b33' : '#6a5326'}`,
+            border: `1px solid ${mock ? T.badgeBorderMock : T.badgeBorderSim}`,
             color: T.amber,
             borderRadius: 999,
             letterSpacing: '0.1em',
@@ -59,7 +59,7 @@ export default function StatusBar({ health, link }: Props) {
           {mock ? 'MOCK' : 'SIMULATION'}
         </span>
         <span style={{ fontFamily: T.fontMono, color: T.muted }}>
-          {health?.model === 'indy7' ? '192.168.3.4' : '—'}
+          {mock ? `${health?.host ?? '—'} (not dialled)` : (health?.host ?? '—')}
         </span>
         <LinkBadge link={link} />
       </div>

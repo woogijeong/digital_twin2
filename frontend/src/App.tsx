@@ -11,7 +11,7 @@ import ViewportOverlays from './components/ViewportOverlays'
 
 export default function App() {
   const [health, setHealth] = useState<Health | null>(null)
-  const { frame, link } = useTelemetry()
+  const { frame, link, stale } = useTelemetry()
   const { jointsDeg, animateTo } = useJointAnimation(frame?.q ?? null)
 
   useEffect(() => {
@@ -51,7 +51,7 @@ export default function App() {
             }}
           />
           <RobotViewer jointsDeg={jointsDeg} />
-          <ViewportOverlays pose={pose} />
+          <ViewportOverlays pose={pose} stale={stale} />
         </div>
 
         <aside
@@ -67,7 +67,12 @@ export default function App() {
             overflow: 'auto',
           }}
         >
-          <PosePanel pose={pose} jointsDeg={jointsDeg} onApply={(jpos) => animateTo(jpos)} />
+          <PosePanel
+            pose={pose}
+            jointsDeg={jointsDeg}
+            stale={stale}
+            onApply={(jpos) => animateTo(jpos)}
+          />
           <JointBars q={jointsDeg} />
           <div
             style={{

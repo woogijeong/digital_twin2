@@ -16,6 +16,13 @@ from app.config import settings
 from app.robot.base import IkFailed, RobotService, RobotUnavailable
 from app.schemas import PoseDTO, TelemetryFrame
 
+# P0 is read + kinematics only. Every SDK call goes through ``_call``, and only
+# these methods may pass -- so no code path (or future edit) can command the
+# physical robot, whatever string it hands to ``_call``.
+_ALLOWED_SDK_CALLS = frozenset(
+    {"get_control_data", "get_control_state", "inverse_kin", "forward_kin", "set_simulation_mode"}
+)
+
 
 class IndyDCP3Robot(RobotService):
     mode = "real"
@@ -56,6 +63,8 @@ class IndyDCP3Robot(RobotService):
         return self._connected
 
     async def _call(self, name: str, *args):
+        if name not in _ALLOWED_SDK_CALLS:
+            raise RuntimeError(f"SDK method {name!r} is not permitted in P0 (read + kinematics only)")
         if self._indy is None:
             raise RobotUnavailable("not connected")
         return await asyncio.to_thread(getattr(self._indy, name), *args)

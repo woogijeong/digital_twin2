@@ -40,3 +40,35 @@ def test_one_disconnect_does_not_break_the_other(client):
         # b closed; a keeps streaming
         for _ in range(5):
             json.loads(a.receive_text())
+
+
+def test_stream_error_does_not_freeze_telemetry(monkeypatch):
+    """A transient stream error must not permanently kill the hub (D1)."""
+    import app.api.telemetry_ws as tw
+    from app.main import app
+    from app.robot.mock import MockRobot
+
+    monkeypatch.setattr(tw, "_STREAM_RETRY_BACKOFF_S", 0.05)
+
+    calls = {"n": 0}
+    real_stream = MockRobot.stream
+
+    def flaky_stream(self):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            async def boom():
+                raise RuntimeError("simulated gRPC hiccup")
+                yield  # pragma: no cover
+            return boom()
+        return real_stream(self)
+
+    monkeypatch.setattr(MockRobot, "stream", flaky_stream)
+
+    from fastapi.testclient import TestClient
+
+    with TestClient(app) as c:
+        with c.websocket_connect("/ws/telemetry") as ws:
+            # first stream() raised; after the backoff the hub re-opens it
+            frame = json.loads(ws.receive_text())
+            assert len(frame["q"]) == 6
+    assert calls["n"] >= 2

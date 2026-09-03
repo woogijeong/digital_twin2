@@ -3,6 +3,7 @@ export interface Health {
   mode: 'real' | 'mock'
   connected: boolean
   model: string
+  host: string
 }
 
 export interface Pose {

@@ -33,8 +33,9 @@ class MockRobot(RobotService):
     def __init__(self) -> None:
         self._t0 = time.monotonic()
         self._connected = False
-        # Latest solved IK target, applied as an offset so the panel visibly reacts.
-        self._offset = [0.0] * 6
+        # After an IK solve the idle motion re-centres on the new joints, so an
+        # applied target actually "sticks" instead of snapping back.
+        self._center = list(_BIAS)
 
     async def connect(self) -> None:
         self._connected = True
@@ -48,9 +49,7 @@ class MockRobot(RobotService):
 
     def _joints_at(self, t: float) -> list[float]:
         return [
-            _BIAS[i]
-            + self._offset[i]
-            + _AMP[i] * math.sin(2 * math.pi * t / _PERIOD[i])
+            self._center[i] + 0.5 * _AMP[i] * math.sin(2 * math.pi * t / _PERIOD[i])
             for i in range(6)
         ]
 
@@ -85,6 +84,7 @@ class MockRobot(RobotService):
         seed[4] = max(-_LIMIT, min(_LIMIT, tpos[4] + 20.0))
         if any(abs(v) >= _LIMIT for v in seed):
             raise IkFailed("solution exceeds joint limits")
+        self._center = list(seed)
         return seed
 
     async def get_pose(self) -> PoseDTO:

@@ -28,6 +28,7 @@ async def health(request: Request) -> HealthResponse:
         mode=robot.mode,
         connected=robot.connected,
         model=settings.model,
+        host=settings.host,
     )
 
 

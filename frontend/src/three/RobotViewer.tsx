@@ -14,9 +14,12 @@ export default function RobotViewer({ jointsDeg }: Props) {
   const mountRef = useRef<HTMLDivElement>(null)
   const robotRef = useRef<LoadedRobot | null>(null)
   const jointsRef = useRef(jointsDeg)
-  jointsRef.current = jointsDeg
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    jointsRef.current = jointsDeg
+  }, [jointsDeg])
 
   useEffect(() => {
     const mount = mountRef.current
@@ -102,6 +105,11 @@ export default function RobotViewer({ jointsDeg }: Props) {
       ro.disconnect()
       controls.dispose()
       robotRef.current?.dispose()
+      robotRef.current = null
+      tcpMarker.geometry.dispose()
+      ;(tcpMarker.material as THREE.Material).dispose()
+      grid.geometry.dispose()
+      ;(grid.material as THREE.Material).dispose()
       renderer.dispose()
       renderer.domElement.remove()
     }

@@ -33,16 +33,16 @@ test('loads the twin, mirrors telemetry, and moves on an applied target', async 
   const xCell = page.locator('text=X · mm').locator('xpath=following-sibling::div').first()
   await expect(xCell).not.toHaveText('—', { timeout: 10_000 })
 
-  // Telemetry mirror: the J1 readout changes over ~1s (mock sine motion)
-  const j1 = page.locator('text=J1').locator('xpath=following-sibling::span').last()
-  const before = await j1.textContent()
+  // Telemetry mirror: the joint readout changes over ~1s (mock idle motion)
+  const jointRow = () =>
+    page.locator('aside span').filter({ hasText: /^-?\d+\.\d$/ }).allTextContents()
+  const j0 = await jointRow()
   await page.waitForTimeout(1200)
-  const after = await j1.textContent()
-  expect(before).not.toEqual(after)
+  expect(await jointRow()).not.toEqual(j0)
 
   await page.screenshot({ path: `${SHOTS}/01-overview.png` })
 
-  // Apply a reachable target -> robot moves (joint readout jumps toward solution)
+  // Apply a reachable target -> the rendered joints move to the IK solution
   const inputs = page.locator('aside input')
   await inputs.nth(0).fill('300')
   await inputs.nth(1).fill('0')
@@ -50,10 +50,15 @@ test('loads the twin, mirrors telemetry, and moves on an applied target', async 
   await inputs.nth(3).fill('180')
   await inputs.nth(4).fill('0')
   await inputs.nth(5).fill('-90')
+  const beforeApply = await jointRow()
   await page.getByRole('button', { name: 'APPLY TARGET' }).click()
   await expect(page.getByRole('button', { name: 'APPLY TARGET' })).toBeEnabled({
     timeout: 10_000,
   })
+  await page.waitForTimeout(1400) // let the tween finish
+  const afterApply = await jointRow()
+  const moved = afterApply.some((v, i) => Math.abs(Number(v) - Number(beforeApply[i])) > 3)
+  expect(moved, `joints did not move: ${beforeApply} -> ${afterApply}`).toBe(true)
   await page.screenshot({ path: `${SHOTS}/02-target-applied.png` })
 
   // Unreachable target -> inline IK error, no crash

@@ -7,9 +7,17 @@ export const T = {
   text: '#cdd6d9',
   muted: '#7c8a90',
   teal: '#46d6c0',
+  onTeal: '#08211f', // text on a teal fill
   tealTrack: '#1c2327',
   amber: '#f2b03d',
   green: '#4ade80',
+  badgeBorderSim: '#6a5326',
+  badgeBorderMock: '#5a6b33',
+  hint: '#5a666b',
+  axisX: '#e0574b',
+  axisY: '#5b9bd5',
+  axisZ: '#4ade80',
+  dim: 0.4, // opacity applied to data readouts when telemetry is stale
   viewportGrid: 'rgba(70,214,192,0.055)',
   viewportBg: 'radial-gradient(circle at 44% 36%, #16201f, #0a0d0f 72%)',
   fontDisplay: "'Space Grotesk', system-ui, sans-serif",

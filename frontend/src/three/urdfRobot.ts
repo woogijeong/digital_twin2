@@ -61,6 +61,15 @@ export function loadIndy7(url = '/robot/indy7.urdf'): Promise<LoadedRobot> {
               m.geometry.dispose()
               ;(m.material as THREE.Material).dispose()
             })
+            // Release the STL geometry + materials URDFLoader created (~9 MiB).
+            robot.traverse((c) => {
+              const mesh = c as THREE.Mesh
+              if (!mesh.isMesh) return
+              mesh.geometry?.dispose()
+              const mat = mesh.material
+              if (Array.isArray(mat)) mat.forEach((m) => m.dispose())
+              else mat?.dispose()
+            })
           },
         })
       },

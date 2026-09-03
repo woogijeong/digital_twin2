@@ -10,6 +10,7 @@ class HealthResponse(BaseModel):
     mode: str = Field(description='"real" or "mock"')
     connected: bool
     model: str
+    host: str = Field(description="controller address (informational; not dialled in mock mode)")
 
 
 class PoseDTO(BaseModel):

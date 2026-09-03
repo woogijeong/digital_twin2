@@ -4,12 +4,12 @@
   "version": "0.1.0",
   "description": "Neuromeka Indy7 collaborative-robot digital twin (P0 MVP)",
   "scripts": {
-    "dev": "concurrently -n api,web -c cyan,magenta \"npm:dev:api\" \"npm:dev:web\"",
+    "dev": "concurrently -n api,web -c cyan,magenta \"pnpm:dev:api\" \"pnpm:dev:web\"",
     "dev:api": "uv run --project backend uvicorn app.main:app --port 8000 --app-dir backend",
     "dev:api:reload": "uv run --project backend uvicorn app.main:app --reload --reload-dir backend/app --port 8000 --app-dir backend",
     "dev:web": "pnpm --dir frontend dev",
     "assets": "uv run --project backend python scripts/fetch_urdf_assets.py",
-    "test": "npm run test:api && npm run test:web && npm run test:e2e",
+    "test": "pnpm run test:api && pnpm run test:web && pnpm run test:e2e",
     "test:api": "uv run --directory backend pytest -q",
     "test:web": "pnpm --dir frontend build",
     "test:e2e": "pnpm --dir frontend exec playwright test"

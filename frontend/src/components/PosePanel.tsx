@@ -8,11 +8,13 @@ interface Props {
   pose: number[] | null
   /** Current joint angles (deg) — the IK seed. */
   jointsDeg: number[]
+  /** telemetry gone quiet -> dim the live readout */
+  stale: boolean
   /** Called with the IK joint solution (deg) when a target is applied. */
   onApply: (jpos: number[]) => void
 }
 
-export default function PosePanel({ pose, jointsDeg, onApply }: Props) {
+export default function PosePanel({ pose, jointsDeg, stale, onApply }: Props) {
   const [target, setTarget] = useState<string[] | null>(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -51,8 +53,8 @@ export default function PosePanel({ pose, jointsDeg, onApply }: Props) {
   return (
     <>
       <section>
-        <SectionHead>TCP POSE&nbsp;&nbsp;/&nbsp;&nbsp;LIVE</SectionHead>
-        <div style={grid3}>
+        <SectionHead>TCP POSE&nbsp;&nbsp;/&nbsp;&nbsp;{stale ? 'STALE' : 'LIVE'}</SectionHead>
+        <div style={{ ...grid3, opacity: stale ? T.dim : 1 }}>
           {AXIS_LABELS.map((label, i) => (
             <div key={label} style={cell}>
               <div style={cellLabel}>
@@ -163,7 +165,7 @@ const applyBtn: CSSProperties = {
   width: '100%',
   padding: 11,
   background: T.teal,
-  color: '#08211f',
+  color: T.onTeal,
   border: 'none',
   borderRadius: 8,
   fontFamily: T.fontDisplay,

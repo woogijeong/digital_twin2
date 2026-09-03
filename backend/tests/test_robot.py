@@ -66,18 +66,30 @@ async def test_factory_falls_back_to_mock(monkeypatch):
     assert robot.connected
 
 
+_MOTION = {"movej", "movel", "movec", "movej_time", "movel_time", "movelf", "amove_j", "amove_l"}
+
+
+async def test_call_rejects_non_allowlisted_sdk_method():
+    """The runtime chokepoint refuses anything but read + kinematics."""
+    robot = IndyDCP3Robot("10.0.0.9")
+    robot._indy = MagicMock()  # pretend connected
+    for name in ("movej", "movel", "start_teleop"):
+        with pytest.raises(RuntimeError, match="not permitted in P0"):
+            await robot._call(name, [0] * 6)
+    # allow-listed calls still dispatch
+    await robot._call("get_control_data")
+    robot._indy.get_control_data.assert_called_once()
+
+
 def test_no_motion_commands_in_p0_code():
-    """P0 must never command real motion: no movej/movel/movec calls anywhere."""
+    """Static backstop: no movej/movel appear as an attribute *or* a string
+    literal (the SDK is reached via getattr, so a string is the real risk)."""
     offenders: list[str] = []
     for path in APP_DIR.rglob("*.py"):
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
-            if isinstance(node, ast.Attribute) and node.attr in {
-                "movej",
-                "movel",
-                "movec",
-                "movej_time",
-                "movel_time",
-            }:
+            if isinstance(node, ast.Attribute) and node.attr in _MOTION:
                 offenders.append(f"{path.name}:{node.lineno} .{node.attr}")
+            elif isinstance(node, ast.Constant) and node.value in _MOTION:
+                offenders.append(f"{path.name}:{node.lineno} {node.value!r}")
     assert not offenders, f"motion commands found: {offenders}"

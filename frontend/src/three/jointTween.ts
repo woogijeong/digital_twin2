@@ -1,4 +1,5 @@
-const easeInOutCubic = (t: number): number =>
+/** cubic ease-in-out */
+const k = (t: number): number =>
   t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
 
 export interface Tween {
@@ -16,21 +17,19 @@ export function tweenJoints(
   durationMs = 1000,
 ): Tween {
   let raf = 0
-  let cancelled = false
+  let settled = false
   const start = performance.now()
+  let rejectDone!: (reason: Error) => void
 
   const done = new Promise<void>((resolve, reject) => {
+    rejectDone = reject
     const tick = (now: number) => {
-      if (cancelled) {
-        reject(new Error('tween cancelled'))
-        return
-      }
       const t = Math.min(1, (now - start) / durationMs)
-      const k = easeInOutCubic(t)
-      onStep(from.map((v, i) => v + (to[i] - v) * k))
+      onStep(from.map((v, i) => v + (to[i] - v) * k(t)))
       if (t < 1) {
         raf = requestAnimationFrame(tick)
       } else {
+        settled = true
         resolve()
       }
     }
@@ -39,8 +38,10 @@ export function tweenJoints(
 
   return {
     cancel() {
-      cancelled = true
+      if (settled) return
+      settled = true
       cancelAnimationFrame(raf)
+      rejectDone(new Error('tween cancelled'))
     },
     done,
   }

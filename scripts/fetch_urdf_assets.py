@@ -62,8 +62,10 @@ def main() -> int:
         "`indy7.urdf` and `meshes/indy7/visual/*.stl` are derived from\n"
         "[neuromeka-robotics/indy-ros2](https://github.com/neuromeka-robotics/indy-ros2)\n"
         "(`humble-indyDCP3` branch), `indy_description` package, licensed BSD-3-Clause.\n\n"
-        "The only modification is rewriting absolute `<mesh filename>` paths to\n"
-        "paths relative to this directory, via `scripts/fetch_urdf_assets.py`.\n",
+        "Modifications made by `scripts/fetch_urdf_assets.py`:\n"
+        "- every `<mesh filename>` (visual **and** collision) is rewritten to a path\n"
+        "  relative to this directory pointing at the downloaded visual STL;\n"
+        "- only the visual meshes are downloaded (the viewer never parses collision).\n",
         encoding="utf-8",
     )
     print(f"OK: wrote {OUT / 'indy7.urdf'} + {len(names)} meshes")

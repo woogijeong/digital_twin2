@@ -39,8 +39,12 @@ simulator, and must be run once before claiming real-mode support.
 
 ## 4. Inverse kinematics
 
-- [ ] Enter a reachable target pose in the UI, `APPLY TARGET` → model animates to
-      it and the resulting `TCP POSE` is close to the requested values.
+- [ ] Enter a reachable target pose in the UI, `APPLY TARGET` → the model
+      animates (~1 s) to the IK solution.
+- [ ] **Expected on real hardware:** P0 issues no motion command, so the real
+      robot stays put; ~1 s after the animation the model snaps back to the live
+      (unchanged) pose. This confirms IK solved correctly but is not commanded.
+      Commanding the move is P1. (In mock mode the model holds the new pose.)
 - [ ] Enter an obviously unreachable target (e.g. X = 5000) → inline
       `IK: ...` message appears, model does not jump.
 

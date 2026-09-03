@@ -7,12 +7,11 @@ def test_health(client):
     r = client.get("/api/health")
     assert r.status_code == 200
     body = r.json()
-    assert body == {
-        "status": "ok",
-        "mode": "mock",
-        "connected": True,
-        "model": "indy7",
-    }
+    assert body["status"] == "ok"
+    assert body["mode"] == "mock"
+    assert body["connected"] is True
+    assert body["model"] == "indy7"
+    assert "host" in body  # informational; not dialled in mock mode
 
 
 def test_pose_returns_six_numbers(client):
