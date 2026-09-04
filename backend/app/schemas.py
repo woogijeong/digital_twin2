@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
+
+ToolId = Literal["none", "suction", "gripper"]
 
 
 class HealthResponse(BaseModel):
@@ -11,6 +15,7 @@ class HealthResponse(BaseModel):
     connected: bool
     model: str
     host: str = Field(description="controller address (informational; not dialled in mock mode)")
+    tool: ToolId = Field(default="none", description="selected end-effector")
 
 
 class PoseDTO(BaseModel):
@@ -44,6 +49,10 @@ class ConnectRequest(BaseModel):
     host: str | None = Field(
         default=None, description="controller address to dial; defaults to INDY_HOST"
     )
+
+
+class ToolRequest(BaseModel):
+    tool: ToolId
 
 
 class StateResponse(BaseModel):

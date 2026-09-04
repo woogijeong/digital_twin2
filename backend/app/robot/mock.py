@@ -20,6 +20,7 @@ from collections.abc import AsyncIterator
 from app.config import settings
 from app.robot import kinematics
 from app.robot.base import RobotService
+from app.robot.tools import TOOL_EXTRA_MM, tcp_offset_mm
 from app.schemas import PoseDTO, TelemetryFrame
 
 # Natural "ready" pose the mock holds until the first target is applied --
@@ -43,11 +44,15 @@ class MockRobot(RobotService):
 
     def __init__(self) -> None:
         self._connected = False
+        self.tool = "none"
         # Active move: ease ``_from`` -> ``_target`` starting at ``_move_start``.
         # Both endpoints equal ``_READY`` initially, so the robot sits still.
         self._from = list(_READY)
         self._target = list(_READY)
         self._move_start = time.monotonic()
+
+    def _tcp(self) -> float:
+        return tcp_offset_mm(self.tool)
 
     async def connect(self) -> None:
         self._connected = True
@@ -67,7 +72,7 @@ class MockRobot(RobotService):
         return self._joints_now()
 
     async def forward_kin(self, jpos: list[float]) -> list[float]:
-        return kinematics.fk(list(jpos))
+        return kinematics.fk(list(jpos), self._tcp())
 
     async def home(self) -> list[float]:
         self._from = self._joints_now()
@@ -75,10 +80,15 @@ class MockRobot(RobotService):
         self._move_start = time.monotonic()
         return list(_READY)
 
+    async def set_tool(self, tool: str) -> None:
+        if tool not in TOOL_EXTRA_MM:
+            raise ValueError(f"unknown tool {tool!r}")
+        self.tool = tool
+
     async def solve_ik(self, tpos: list[float], init_jpos: list[float]) -> list[float]:
         # Real numerical IK against the URDF model; raises IkFailed when the
         # target is out of reach or the solution breaks a joint limit.
-        solution = kinematics.ik(list(tpos), list(init_jpos))
+        solution = kinematics.ik(list(tpos), list(init_jpos), tcp_offset_mm=self._tcp())
         # Begin easing from the live position to the new solution, then hold.
         self._from = self._joints_now()
         self._target = list(solution)
@@ -86,12 +96,12 @@ class MockRobot(RobotService):
         return solution
 
     async def get_pose(self) -> PoseDTO:
-        return PoseDTO.from_list(kinematics.fk(await self.get_joints()))
+        return PoseDTO.from_list(kinematics.fk(await self.get_joints(), self._tcp()))
 
     async def stream(self) -> AsyncIterator[TelemetryFrame]:
         period = 1.0 / max(settings.telemetry_hz, 1.0)
         while True:
             q = await self.get_joints()
-            p = kinematics.fk(q)
+            p = kinematics.fk(q, self._tcp())
             yield TelemetryFrame(q=q, p=p, ts=time.time())
             await asyncio.sleep(period)

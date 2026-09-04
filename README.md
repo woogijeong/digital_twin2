@@ -57,6 +57,11 @@ Design direction: **"Control Room"** — a dark industrial HMI (see
   `set_simulation_mode(True)`; there is no `movej` / `movel` in any P0 code path
   (enforced by a test). `RESET TO HOME` is a mock-only convenience — against a
   real controller it returns `409`.
+- **End effector.** `NONE` / `SUCTION` / `GRIPPER` (`POST /api/tool`) shifts the
+  TCP the kinematics report to the tool tip and renders procedural tool geometry
+  on the flange; the gripper has an open/close toggle. Connected to a real
+  controller it also pushes `set_tool_frame` (a TCP-reference config, allowed in
+  P0 — it does not move the robot).
 - **No controller? It still runs.** If `192.168.3.4` is unreachable the backend
   falls back to `MockRobot` and the UI shows a `MOCK` badge. The mock holds a
   ready pose and eases to applied targets using forward/inverse kinematics

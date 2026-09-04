@@ -19,13 +19,21 @@ from app.robot.base import (
     RobotService,
     RobotUnavailable,
 )
+from app.robot.tools import TOOL_EXTRA_MM, tool_frame_fpos
 from app.schemas import PoseDTO, TelemetryFrame
 
-# P0 is read + kinematics only. Every SDK call goes through ``_call``, and only
-# these methods may pass -- so no code path (or future edit) can command the
-# physical robot, whatever string it hands to ``_call``.
+# P0 is read + kinematics + the TCP tool frame. Every SDK call goes through
+# ``_call`` and only these may pass -- so no code path (or future edit) can
+# command physical motion (``movej`` / ``movel`` / teleop), whatever string it
+# hands to ``_call``. ``set_tool_frame`` is a TCP-reference config, not motion.
 _ALLOWED_SDK_CALLS = frozenset(
-    {"get_control_data", "inverse_kin", "forward_kin", "set_simulation_mode"}
+    {
+        "get_control_data",
+        "inverse_kin",
+        "forward_kin",
+        "set_simulation_mode",
+        "set_tool_frame",
+    }
 )
 
 
@@ -36,6 +44,7 @@ class IndyDCP3Robot(RobotService):
         self._host = host or settings.host
         self._indy = None
         self._connected = False
+        self.tool = "none"
 
     @property
     def host(self) -> str:
@@ -105,6 +114,13 @@ class IndyDCP3Robot(RobotService):
         raise MotionNotPermitted(
             "connected to the real controller -- P0 does not command robot motion"
         )
+
+    async def set_tool(self, tool: str) -> None:
+        if tool not in TOOL_EXTRA_MM:
+            raise ValueError(f"unknown tool {tool!r}")
+        # Configures the controller's TCP reference; not a motion command.
+        await self._call("set_tool_frame", tool_frame_fpos(tool))
+        self.tool = tool
 
     async def stream(self) -> AsyncIterator[TelemetryFrame]:
         period = 1.0 / max(settings.telemetry_hz, 1.0)

@@ -76,9 +76,11 @@ async def test_call_rejects_non_allowlisted_sdk_method():
     for name in ("movej", "movel", "start_teleop"):
         with pytest.raises(RuntimeError, match="not permitted in P0"):
             await robot._call(name, [0] * 6)
-    # allow-listed calls still dispatch
+    # allow-listed calls still dispatch (read, kinematics, TCP tool frame)
     await robot._call("get_control_data")
     robot._indy.get_control_data.assert_called_once()
+    await robot._call("set_tool_frame", [0, 0, 60, 0, 0, 0])
+    robot._indy.set_tool_frame.assert_called_once()
 
 
 def test_no_motion_commands_in_p0_code():

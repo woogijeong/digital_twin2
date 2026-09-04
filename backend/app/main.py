@@ -25,6 +25,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.robot = robot
     app.state.telemetry_hub = hub
     app.state.active_host = settings.host
+    app.state.active_tool = robot.tool
     try:
         yield
     finally:

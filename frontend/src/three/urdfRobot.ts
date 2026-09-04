@@ -1,6 +1,8 @@
 import * as THREE from 'three'
 import URDFLoader, { type URDFRobot } from 'urdf-loader'
+import type { ToolId } from '../api/client'
 import { SCENE } from '../theme'
+import { buildTool, type ToolMesh } from './toolMesh'
 
 export const JOINT_NAMES = ['joint0', 'joint1', 'joint2', 'joint3', 'joint4', 'joint5'] as const
 
@@ -10,7 +12,11 @@ export interface LoadedRobot {
   object: THREE.Object3D
   /** Drive the six revolute joints. `q` is in degrees, joint0..joint5 order. */
   setJoints(q: number[]): void
-  /** World-space position of the TCP link, for the pose marker. */
+  /** Mount an end-effector on the flange (or `none` to bare it). */
+  setTool(tool: ToolId): void
+  /** Gripper only: slide the fingers (animated). No-op for other tools. */
+  setGripperOpen(open: boolean): void
+  /** World-space position of the working point (tool tip, or bare TCP). */
   tcpWorldPosition(target: THREE.Vector3): THREE.Vector3
   dispose(): void
 }
@@ -43,6 +49,22 @@ export function loadIndy7(url = '/robot/indy7.urdf'): Promise<LoadedRobot> {
 
         const jointMarks = addJointMarkers(robot)
         const tcp = robot.links['tcp'] as THREE.Object3D | undefined
+        const flange = robot.links['link6'] as THREE.Object3D | undefined
+
+        let tool: ToolMesh | null = null
+        let gripFrac = 1
+        let gripTarget = 1
+        let gripRaf = 0
+        const animateGrip = () => {
+          gripFrac += (gripTarget - gripFrac) * 0.25
+          if (Math.abs(gripTarget - gripFrac) < 0.002) {
+            gripFrac = gripTarget
+            gripRaf = 0
+          } else {
+            gripRaf = requestAnimationFrame(animateGrip)
+          }
+          tool?.setOpen(gripFrac)
+        }
 
         resolve({
           object: robot,
@@ -52,11 +74,32 @@ export function loadIndy7(url = '/robot/indy7.urdf'): Promise<LoadedRobot> {
             })
             robot.updateMatrixWorld(true)
           },
+          setTool(next) {
+            if (tool) {
+              tool.group.parent?.remove(tool.group)
+              tool.dispose()
+              tool = null
+            }
+            if (next !== 'none' && flange) {
+              tool = buildTool(next)
+              tool.setOpen(gripFrac)
+              flange.add(tool.group)
+            }
+            robot.updateMatrixWorld(true)
+          },
+          setGripperOpen(open) {
+            gripTarget = open ? 1 : 0
+            if (!gripRaf) gripRaf = requestAnimationFrame(animateGrip)
+          },
           tcpWorldPosition(target) {
+            if (tool) return tool.tip.getWorldPosition(target)
             if (tcp) return tcp.getWorldPosition(target)
             return target.copy(robot.position)
           },
           dispose() {
+            if (gripRaf) cancelAnimationFrame(gripRaf)
+            tool?.group.parent?.remove(tool.group)
+            tool?.dispose()
             jointMarks.forEach((m) => {
               m.geometry.dispose()
               ;(m.material as THREE.Material).dispose()

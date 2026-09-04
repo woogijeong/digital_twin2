@@ -1,9 +1,12 @@
+export type ToolId = 'none' | 'suction' | 'gripper'
+
 export interface Health {
   status: string
   mode: 'real' | 'mock'
   connected: boolean
   model: string
   host: string
+  tool: ToolId
 }
 
 export type PoseTuple = [number, number, number, number, number, number]
@@ -50,6 +53,12 @@ export function connectController(host: string): Promise<Health> {
 /** Drop the controller connection and fall back to the offline mock. */
 export function disconnectController(): Promise<Health> {
   return postJson('/api/disconnect') as Promise<Health>
+}
+
+/** Select the end-effector. Shifts the reported TCP to the tool tip; against a
+ *  real controller also pushes `set_tool_frame`. */
+export function setTool(tool: ToolId): Promise<Health> {
+  return postJson('/api/tool', { tool }) as Promise<Health>
 }
 
 /** Send the twin to its home pose; resolves to the home joint angles (deg).

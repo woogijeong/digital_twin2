@@ -31,7 +31,8 @@ _JOINT_ORIGINS: list[tuple[tuple[float, float, float], tuple[float, float, float
     ((0.0, -0.114, 0.083), (_HALF_PI, _HALF_PI, 0.0)),
     ((-0.168, 0.0, 0.069), (-_HALF_PI, 0.0, _HALF_PI)),
 ]
-_TCP_ORIGIN = ((0.0, 0.0, 0.06), (0.0, 0.0, 0.0))
+# Bare-flange TCP: link6 -> tcp from the URDF. A tool extends this along +Z.
+_FLANGE_TCP_M = 0.06
 
 # URDF revolute limits, joint0..joint5, in degrees (±175° for J1-J5, ±215° J6).
 JOINT_LIMITS_DEG: list[float] = [175.0, 175.0, 175.0, 175.0, 175.0, 215.0]
@@ -87,18 +88,22 @@ def _rotvec(r: tuple[float, ...]) -> list[float]:
     return [c * scale for c in axis]
 
 
-def _frame(q_rad: list[float]) -> tuple[tuple[float, ...], tuple[float, float, float]]:
-    """Base -> TCP transform for joint angles in radians."""
+def _frame(
+    q_rad: list[float], tcp_z: float = _FLANGE_TCP_M
+) -> tuple[tuple[float, ...], tuple[float, float, float]]:
+    """Base -> TCP transform for joint angles in radians.
+
+    ``tcp_z`` is the flange -> tool-tip distance along the flange normal, in
+    metres (default: the bare-flange URDF value).
+    """
     rot = _IDENTITY
     pos = (0.0, 0.0, 0.0)
     for i, (xyz, rpy) in enumerate(_JOINT_ORIGINS):
         off = _mat_vec(rot, xyz)
         pos = (pos[0] + off[0], pos[1] + off[1], pos[2] + off[2])
         rot = _mat_mul(_mat_mul(rot, _rpy_matrix(*rpy)), _rotz(q_rad[i]))
-    xyz, rpy = _TCP_ORIGIN
-    off = _mat_vec(rot, xyz)
-    pos = (pos[0] + off[0], pos[1] + off[1], pos[2] + off[2])
-    rot = _mat_mul(rot, _rpy_matrix(*rpy))
+    tip = _mat_vec(rot, (0.0, 0.0, tcp_z))
+    pos = (pos[0] + tip[0], pos[1] + tip[1], pos[2] + tip[2])
     return rot, pos
 
 
@@ -111,9 +116,12 @@ def _euler_xyz(r: tuple[float, ...]) -> tuple[float, float, float]:
     return math.atan2(-r[5], r[4]), math.atan2(-r[6], sy), 0.0
 
 
-def fk(q_deg: list[float]) -> list[float]:
-    """TCP pose ``[x, y, z, rx, ry, rz]`` (mm, deg) in the base frame."""
-    rot, pos = _frame([math.radians(v) for v in q_deg])
+def fk(q_deg: list[float], tcp_offset_mm: float = _FLANGE_TCP_M * 1000.0) -> list[float]:
+    """TCP pose ``[x, y, z, rx, ry, rz]`` (mm, deg) in the base frame.
+
+    ``tcp_offset_mm`` is the flange -> tool-tip distance (default: bare flange).
+    """
+    rot, pos = _frame([math.radians(v) for v in q_deg], tcp_offset_mm / 1000.0)
     rx, ry, rz = _euler_xyz(rot)
     return [
         pos[0] * 1000.0,
@@ -125,15 +133,17 @@ def fk(q_deg: list[float]) -> list[float]:
     ]
 
 
-def _jacobian(q_rad: list[float], h: float = 1e-6) -> list[list[float]]:
+def _jacobian(
+    q_rad: list[float], tcp_z: float = _FLANGE_TCP_M, h: float = 1e-6
+) -> list[list[float]]:
     """6x6 finite-difference Jacobian: rows [dpx dpy dpz dwx dwy dwz], cols per joint."""
-    rot0, pos0 = _frame(q_rad)
+    rot0, pos0 = _frame(q_rad, tcp_z)
     rot0_t = _transpose(rot0)
     cols: list[list[float]] = []
     for i in range(6):
         qp = list(q_rad)
         qp[i] += h
-        rot1, pos1 = _frame(qp)
+        rot1, pos1 = _frame(qp, tcp_z)
         dp = [(pos1[k] - pos0[k]) / h for k in range(3)]
         dw = [c / h for c in _rotvec(_mat_mul(rot1, rot0_t))]
         cols.append(dp + dw)
@@ -164,9 +174,10 @@ def _pose_residual(
     q_rad: list[float],
     tgt_pos: tuple[float, float, float],
     tgt_rot: tuple[float, ...],
+    tcp_z: float,
 ) -> tuple[list[float], float, float]:
     """6-vector task error and its (position mm, rotation deg) magnitudes."""
-    rot, pos = _frame(q_rad)
+    rot, pos = _frame(q_rad, tcp_z)
     err = [tgt_pos[k] - pos[k] for k in range(3)]
     err += _rotvec(_mat_mul(tgt_rot, _transpose(rot)))
     return err, math.hypot(*err[:3]) * 1000.0, math.degrees(math.hypot(*err[3:]))
@@ -176,16 +187,17 @@ def _solve_from_seed(
     seed_rad: list[float],
     tgt_pos: tuple[float, float, float],
     tgt_rot: tuple[float, ...],
+    tcp_z: float,
     max_iters: int,
 ) -> tuple[list[float], float, float]:
     """Levenberg-Marquardt descent from one seed. Returns the best (q, pos_mm, rot_deg)."""
     q = list(seed_rad)
-    err, pos_mm, rot_deg = _pose_residual(q, tgt_pos, tgt_rot)
+    err, pos_mm, rot_deg = _pose_residual(q, tgt_pos, tgt_rot, tcp_z)
     lam = 1e-3
     for _ in range(max_iters):
         if pos_mm < 1e-4 and rot_deg < 1e-3:
             break
-        j = _jacobian(q)
+        j = _jacobian(q, tcp_z)
         # (JᵀJ + λ·diag(JᵀJ)) dq = Jᵀ e   -- LM normal equations.
         jtj = [[sum(j[r][a] * j[r][b] for r in range(6)) for b in range(6)] for a in range(6)]
         jte = [sum(j[r][a] * err[r] for r in range(6)) for a in range(6)]
@@ -201,7 +213,7 @@ def _solve_from_seed(
         if biggest > 0.5:  # rad; cap the per-step joint change
             dq = [v * (0.5 / biggest) for v in dq]
         trial = [q[i] + dq[i] for i in range(6)]
-        t_err, t_pos_mm, t_rot_deg = _pose_residual(trial, tgt_pos, tgt_rot)
+        t_err, t_pos_mm, t_rot_deg = _pose_residual(trial, tgt_pos, tgt_rot, tcp_z)
         if t_pos_mm + t_rot_deg < pos_mm + rot_deg:
             q, err, pos_mm, rot_deg = trial, t_err, t_pos_mm, t_rot_deg
             lam = max(lam * 0.5, 1e-9)
@@ -214,6 +226,7 @@ def ik(
     target_pose: list[float],
     seed_deg: list[float],
     *,
+    tcp_offset_mm: float = _FLANGE_TCP_M * 1000.0,
     max_iters: int = 160,
     tol_pos_mm: float = 0.05,
     tol_rot_deg: float = 0.01,
@@ -229,6 +242,7 @@ def ik(
     """
     tgt_pos = (target_pose[0] / 1000.0, target_pose[1] / 1000.0, target_pose[2] / 1000.0)
     tgt_rot = _rpy_matrix(*(math.radians(v) for v in target_pose[3:6]))
+    tcp_z = tcp_offset_mm / 1000.0
 
     def _wrap(a: float) -> float:
         return math.atan2(math.sin(a), math.cos(a))
@@ -245,7 +259,7 @@ def ik(
 
     best: tuple[list[float], float, float] | None = None
     for seed in seeds:
-        q, pos_mm, rot_deg = _solve_from_seed(seed, tgt_pos, tgt_rot, max_iters)
+        q, pos_mm, rot_deg = _solve_from_seed(seed, tgt_pos, tgt_rot, tcp_z, max_iters)
         if pos_mm < tol_pos_mm and rot_deg < tol_rot_deg:
             best = (q, pos_mm, rot_deg)
             break
