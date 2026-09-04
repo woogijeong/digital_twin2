@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import type { ToolId } from '../api/client'
 import { SCENE, T } from '../theme'
 import AxisGizmo, { type AxisProjection } from '../components/AxisGizmo'
 import { loadIndy7, type LoadedRobot } from './urdfRobot'
@@ -19,13 +20,19 @@ const BASE_AXES: Array<{ key: AxisProjection['key']; color: string; v: THREE.Vec
 interface Props {
   /** Rendered joint angles, degrees, joint0..joint5. */
   jointsDeg: number[]
+  /** Mounted end-effector. */
+  tool: ToolId
+  /** Gripper finger state (ignored unless `tool === 'gripper'`). */
+  gripperOpen: boolean
 }
 
 /** three.js viewport. Owns the render loop; joint state is pushed in via props. */
-export default function RobotViewer({ jointsDeg }: Props) {
+export default function RobotViewer({ jointsDeg, tool, gripperOpen }: Props) {
   const mountRef = useRef<HTMLDivElement>(null)
   const robotRef = useRef<LoadedRobot | null>(null)
   const jointsRef = useRef(jointsDeg)
+  const toolRef = useRef(tool)
+  const gripperRef = useRef(gripperOpen)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [gizmoAxes, setGizmoAxes] = useState<AxisProjection[] | null>(null)
@@ -33,6 +40,16 @@ export default function RobotViewer({ jointsDeg }: Props) {
   useEffect(() => {
     jointsRef.current = jointsDeg
   }, [jointsDeg])
+
+  useEffect(() => {
+    toolRef.current = tool
+    robotRef.current?.setTool(tool)
+  }, [tool])
+
+  useEffect(() => {
+    gripperRef.current = gripperOpen
+    robotRef.current?.setGripperOpen(gripperOpen)
+  }, [gripperOpen])
 
   useEffect(() => {
     const mount = mountRef.current
@@ -100,6 +117,8 @@ export default function RobotViewer({ jointsDeg }: Props) {
         robotRef.current = robot
         scene.add(robot.object)
         robot.setJoints(jointsRef.current)
+        robot.setTool(toolRef.current)
+        robot.setGripperOpen(gripperRef.current)
         setLoading(false)
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))

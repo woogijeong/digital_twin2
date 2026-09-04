@@ -1,16 +1,19 @@
 import { useEffect, useState } from 'react'
 import { T } from './theme'
-import { getHealth, type Health } from './api/client'
+import { getHealth, setTool, type Health, type ToolId } from './api/client'
 import { useTelemetry } from './hooks/useTelemetry'
 import { useJointAnimation } from './hooks/useJointAnimation'
 import RobotViewer from './three/RobotViewer'
 import StatusBar from './components/StatusBar'
 import PosePanel from './components/PosePanel'
+import ToolPanel from './components/ToolPanel'
 import JointBars from './components/JointBars'
 import ViewportOverlays from './components/ViewportOverlays'
 
 export default function App() {
   const [health, setHealth] = useState<Health | null>(null)
+  const [gripperOpen, setGripperOpen] = useState(true)
+  const [toolBusy, setToolBusy] = useState(false)
   const { frame, link, stale } = useTelemetry()
   const { jointsDeg, animateTo } = useJointAnimation(frame?.q ?? null)
 
@@ -19,6 +22,18 @@ export default function App() {
   }, [])
 
   const pose = frame?.p ?? null
+  const tool: ToolId = health?.tool ?? 'none'
+
+  const selectTool = async (next: ToolId) => {
+    setToolBusy(true)
+    try {
+      setHealth(await setTool(next))
+    } catch {
+      /* keep the current tool on failure */
+    } finally {
+      setToolBusy(false)
+    }
+  }
 
   return (
     <div
@@ -50,7 +65,7 @@ export default function App() {
               pointerEvents: 'none',
             }}
           />
-          <RobotViewer jointsDeg={jointsDeg} />
+          <RobotViewer jointsDeg={jointsDeg} tool={tool} gripperOpen={gripperOpen} />
           <ViewportOverlays pose={pose} stale={stale} />
         </div>
 
@@ -73,6 +88,13 @@ export default function App() {
             stale={stale}
             mode={health?.mode ?? null}
             onApply={(jpos) => animateTo(jpos)}
+          />
+          <ToolPanel
+            tool={tool}
+            gripperOpen={gripperOpen}
+            busy={toolBusy}
+            onSelect={selectTool}
+            onGripperToggle={setGripperOpen}
           />
           <JointBars q={jointsDeg} />
           <div

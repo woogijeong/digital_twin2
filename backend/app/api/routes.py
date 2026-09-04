@@ -20,6 +20,7 @@ from app.schemas import (
     IkResponse,
     PoseDTO,
     StateResponse,
+    ToolRequest,
 )
 
 router = APIRouter(prefix="/api")
@@ -40,13 +41,16 @@ def _health(request: Request) -> HealthResponse:
         connected=robot.connected,
         model=settings.model,
         host=_active_host(request),
+        tool=robot.tool,
     )
 
 
 async def _swap_robot(request: Request, new: RobotService, host: str) -> None:
-    """Make ``new`` the live robot: repoint telemetry, then close the old one."""
+    """Make ``new`` the live robot: carry the tool over, repoint telemetry,
+    then close the old one."""
     app = request.app
     old = app.state.robot
+    await new.set_tool(getattr(app.state, "active_tool", "none"))
     app.state.robot = new
     app.state.active_host = host
     await app.state.telemetry_hub.swap(new)
@@ -113,4 +117,16 @@ async def disconnect(request: Request) -> HealthResponse:
     mock = MockRobot()
     await mock.connect()
     await _swap_robot(request, mock, settings.host)
+    return _health(request)
+
+
+@router.post("/tool", response_model=HealthResponse)
+async def tool(request: Request, body: ToolRequest) -> HealthResponse:
+    try:
+        await _robot(request).set_tool(body.tool)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422, detail={"error": "bad_tool", "detail": str(exc)}
+        ) from exc
+    request.app.state.active_tool = body.tool
     return _health(request)

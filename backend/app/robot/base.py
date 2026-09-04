@@ -33,6 +33,7 @@ class RobotService(abc.ABC):
     """
 
     mode: str  # "real" | "mock"
+    tool: str  # "none" | "suction" | "gripper" -- the selected end-effector
 
     @abc.abstractmethod
     async def connect(self) -> None: ...
@@ -69,6 +70,16 @@ class RobotService(abc.ABC):
 
         Raises :class:`MotionNotPermitted` for services that mirror a real
         controller -- P0 only ever commands the offline mock.
+        """
+
+    @abc.abstractmethod
+    async def set_tool(self, tool: str) -> None:
+        """Select the end-effector (``none`` / ``suction`` / ``gripper``).
+
+        Shifts the TCP the kinematics report to the tool tip. On a real
+        controller this also pushes ``set_tool_frame`` -- a TCP-reference
+        config, not a motion command. Raises :class:`ValueError` for an
+        unknown tool id.
         """
 
     @abc.abstractmethod

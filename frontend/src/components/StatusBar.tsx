@@ -154,11 +154,11 @@ const connBtn: CSSProperties = {
   cursor: 'pointer',
 }
 const connBtnGo: CSSProperties = {
-  borderColor: T.teal,
+  border: `1px solid ${T.teal}`,
   color: T.teal,
 }
 const connBtnErr: CSSProperties = {
-  borderColor: T.amber,
+  border: `1px solid ${T.amber}`,
   color: T.amber,
 }
 const errText: CSSProperties = {

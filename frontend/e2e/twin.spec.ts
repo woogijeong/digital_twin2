@@ -134,3 +134,28 @@ test('connecting to an unreachable controller reports an error and stays on mock
   await expect(page.locator('header')).toContainText('MOCK')
   await expect(page.locator('header')).not.toContainText('SIMULATION')
 })
+
+test('end-effector selection shifts the reported TCP', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.getByText('LINKED')).toBeVisible({ timeout: 10_000 })
+
+  const readZ = async () => {
+    const el = page.locator('text=Z · mm').locator('xpath=following-sibling::div').first()
+    await expect(el).not.toHaveText('—', { timeout: 10_000 })
+    return Number(((await el.textContent()) ?? '').replace('−', '-'))
+  }
+
+  // Normalise state: home pose, no tool.
+  await page.getByRole('button', { name: 'RESET TO HOME' }).click()
+  await page.getByRole('button', { name: 'NONE', exact: true }).click()
+  await page.waitForTimeout(1400)
+  const zBare = await readZ()
+
+  // GRIPPER adds 115 mm of tool; the ready pose points it straight down.
+  await page.getByRole('button', { name: 'GRIPPER', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'OPEN', exact: true })).toBeVisible()
+  await expect.poll(readZ).toBeLessThan(zBare - 80)
+
+  await page.getByRole('button', { name: 'NONE', exact: true }).click()
+  await expect.poll(readZ).toBeCloseTo(zBare, 0)
+})
