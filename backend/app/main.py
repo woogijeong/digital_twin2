@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import router as api_router
 from app.api.telemetry_ws import TelemetryHub, router as ws_router
+from app.config import settings
 from app.robot.factory import create_robot
 
 logging.basicConfig(level=logging.INFO)
@@ -23,11 +24,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     hub.start()
     app.state.robot = robot
     app.state.telemetry_hub = hub
+    app.state.active_host = settings.host
     try:
         yield
     finally:
         await hub.stop()
-        await robot.close()
+        await app.state.robot.close()  # may have been swapped by /connect
 
 
 app = FastAPI(title="Indy7 Digital Twin", version="0.1.0", lifespan=lifespan)

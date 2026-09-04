@@ -2,7 +2,19 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { SCENE, T } from '../theme'
+import AxisGizmo, { type AxisProjection } from '../components/AxisGizmo'
 import { loadIndy7, type LoadedRobot } from './urdfRobot'
+
+// URDF is Z-up; the scene is Y-up (the robot object is rotated to match). The
+// gizmo shows the URDF base axes, so they get the same rotation.
+const URDF_TO_SCENE = new THREE.Quaternion().setFromEuler(
+  new THREE.Euler(-Math.PI / 2, 0, 0),
+)
+const BASE_AXES: Array<{ key: AxisProjection['key']; color: string; v: THREE.Vector3 }> = [
+  { key: 'X', color: T.axisX, v: new THREE.Vector3(1, 0, 0).applyQuaternion(URDF_TO_SCENE) },
+  { key: 'Y', color: T.axisY, v: new THREE.Vector3(0, 1, 0).applyQuaternion(URDF_TO_SCENE) },
+  { key: 'Z', color: T.axisZ, v: new THREE.Vector3(0, 0, 1).applyQuaternion(URDF_TO_SCENE) },
+]
 
 interface Props {
   /** Rendered joint angles, degrees, joint0..joint5. */
@@ -16,6 +28,7 @@ export default function RobotViewer({ jointsDeg }: Props) {
   const jointsRef = useRef(jointsDeg)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [gizmoAxes, setGizmoAxes] = useState<AxisProjection[] | null>(null)
 
   useEffect(() => {
     jointsRef.current = jointsDeg
@@ -62,6 +75,11 @@ export default function RobotViewer({ jointsDeg }: Props) {
     let raf = 0
     let disposed = false
 
+    // Orientation gizmo: project the base axes into view space, ~30 fps.
+    const viewInv = new THREE.Matrix4()
+    const axisDir = new THREE.Vector3()
+    let gizmoAt = 0
+
     const resize = () => {
       const { clientWidth: w, clientHeight: h } = mount
       if (!w || !h) return
@@ -95,6 +113,20 @@ export default function RobotViewer({ jointsDeg }: Props) {
         tcpMarker.position.copy(tcpVec)
       }
       controls.update()
+
+      const now = performance.now()
+      if (now - gizmoAt > 33) {
+        gizmoAt = now
+        camera.updateMatrixWorld()
+        viewInv.copy(camera.matrixWorld).invert()
+        setGizmoAxes(
+          BASE_AXES.map(({ key, color, v }) => {
+            axisDir.copy(v).transformDirection(viewInv)
+            return { key, color, x: axisDir.x, y: axisDir.y, z: axisDir.z }
+          }),
+        )
+      }
+
       renderer.render(scene, camera)
     }
     tick()
@@ -118,6 +150,7 @@ export default function RobotViewer({ jointsDeg }: Props) {
   return (
     <div style={{ position: 'absolute', inset: 0 }}>
       <div ref={mountRef} style={{ position: 'absolute', inset: 0 }} />
+      {gizmoAxes && !error && <AxisGizmo axes={gizmoAxes} />}
       {loading && !error && (
         <div style={overlayCenter}>
           <span style={{ fontFamily: T.fontMono, fontSize: 12, color: T.muted }}>

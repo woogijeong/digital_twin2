@@ -10,8 +10,9 @@
 
 A browser-based digital twin of the Neuromeka **Indy7** collaborative robot.
 Loads the real `indy_description` URDF into a three.js viewport, shows the live
-TCP pose (X, Y, Z, Rx, Ry, Rz), and lets you type a target pose that the
-controller solves with inverse kinematics and the model animates to.
+TCP pose (X, Y, Z, Rx, Ry, Rz), and lets you type a target pose — absolute in
+the base frame, or a relative offset from the current pose — that the controller
+solves with inverse kinematics and the model animates to.
 
 Design direction: **"Control Room"** — a dark industrial HMI (see
 `.omc/plans/2026-09-03-neuromeka-digital-twin-p0.md` §8).
@@ -54,10 +55,17 @@ Design direction: **"Control Room"** — a dark industrial HMI (see
   conversion).
 - **P0 never commands motion.** On connect the controller is put into
   `set_simulation_mode(True)`; there is no `movej` / `movel` in any P0 code path
-  (enforced by a test).
+  (enforced by a test). `RESET TO HOME` is a mock-only convenience — against a
+  real controller it returns `409`.
 - **No controller? It still runs.** If `192.168.3.4` is unreachable the backend
-  falls back to `MockRobot` (a deterministic idle motion) and the UI shows a
-  `MOCK` badge.
+  falls back to `MockRobot` and the UI shows a `MOCK` badge. The mock holds a
+  ready pose and eases to applied targets using forward/inverse kinematics
+  derived from the committed Indy7 URDF, so its poses are in the same base
+  (reference) frame the real controller reports and line up with the 3D model.
+- **Connect / disconnect from the UI.** The status bar has an editable
+  controller address and a `CONNECT` / `DISCONNECT` toggle (`POST /api/connect`
+  · `/api/disconnect`); the open telemetry socket is repointed at the new source
+  without a reload. A failed dial reports inline and stays on the mock.
 
 ## Prerequisites
 

@@ -38,6 +38,19 @@ class TelemetryHub:
         if self._task is None:
             self._task = asyncio.create_task(self._run())
 
+    async def swap(self, robot: RobotService) -> None:
+        """Point the poller at a different robot (connect / disconnect) without
+        dropping subscribers -- the open WebSockets just start seeing the new
+        source."""
+        self._robot = robot
+        if self._task is not None:
+            self._task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._task
+            self._task = None
+        if not self._stopping:
+            self._task = asyncio.create_task(self._run())
+
     async def stop(self) -> None:
         self._stopping = True
         if self._task is not None:

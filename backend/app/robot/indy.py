@@ -13,7 +13,12 @@ import time
 from collections.abc import AsyncIterator
 
 from app.config import settings
-from app.robot.base import IkFailed, RobotService, RobotUnavailable
+from app.robot.base import (
+    IkFailed,
+    MotionNotPermitted,
+    RobotService,
+    RobotUnavailable,
+)
 from app.schemas import PoseDTO, TelemetryFrame
 
 # P0 is read + kinematics only. Every SDK call goes through ``_call``, and only
@@ -31,6 +36,10 @@ class IndyDCP3Robot(RobotService):
         self._host = host or settings.host
         self._indy = None
         self._connected = False
+
+    @property
+    def host(self) -> str:
+        return self._host
 
     async def connect(self) -> None:
         try:
@@ -90,6 +99,12 @@ class IndyDCP3Robot(RobotService):
     async def forward_kin(self, jpos: list[float]) -> list[float]:
         res = await self._call("forward_kin", list(jpos))
         return list(res["tpos"])
+
+    async def home(self) -> list[float]:
+        # P0 mirrors the real controller and never commands its motion.
+        raise MotionNotPermitted(
+            "connected to the real controller -- P0 does not command robot motion"
+        )
 
     async def stream(self) -> AsyncIterator[TelemetryFrame]:
         period = 1.0 / max(settings.telemetry_hz, 1.0)

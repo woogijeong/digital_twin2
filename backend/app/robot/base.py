@@ -20,6 +20,11 @@ class IkFailed(ValueError):
     """Raised when inverse kinematics has no usable solution for a target."""
 
 
+class MotionNotPermitted(RuntimeError):
+    """Raised when motion is requested against a service that must not move the
+    real robot. P0 only commands the offline mock."""
+
+
 class RobotService(abc.ABC):
     """Read-only-plus-IK view of a 6-DOF Indy robot.
 
@@ -57,6 +62,14 @@ class RobotService(abc.ABC):
     @abc.abstractmethod
     async def forward_kin(self, jpos: list[float]) -> list[float]:
         """TCP pose (mm, deg) for a joint configuration."""
+
+    @abc.abstractmethod
+    async def home(self) -> list[float]:
+        """Send the twin to its home pose; return the home joint angles (deg).
+
+        Raises :class:`MotionNotPermitted` for services that mirror a real
+        controller -- P0 only ever commands the offline mock.
+        """
 
     @abc.abstractmethod
     def stream(self) -> AsyncIterator[TelemetryFrame]:

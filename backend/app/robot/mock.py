@@ -1,41 +1,53 @@
 """Offline mock robot.
 
-Deterministic 6-joint motion so the whole app (viewer, telemetry, pose panel)
-can run and be tested with no controller on the network. The kinematics here
-are a lightweight planar stand-in -- good enough to prove the data path and the
-IK round-trip contract, not a faithful Indy7 model.
+Deterministic 6-joint model so the whole app (viewer, telemetry, pose panel)
+can run and be tested with no controller on the network. The robot holds a
+"ready" pose at rest and eases to a new joint configuration whenever a target is
+applied -- it never drifts on its own.
+
+Kinematics come from :mod:`app.robot.kinematics`, which is derived straight from
+the committed Indy7 URDF, so mock poses are expressed in the same **base
+(reference) frame** the real controller reports (mm, and fixed-axis XYZ Euler
+degrees) and line up with the rendered 3D model.
 """
 
 from __future__ import annotations
 
 import asyncio
-import math
 import time
 from collections.abc import AsyncIterator
 
 from app.config import settings
-from app.robot.base import IkFailed, RobotService
+from app.robot import kinematics
+from app.robot.base import RobotService
 from app.schemas import PoseDTO, TelemetryFrame
 
-# Gentle idle "breathing" motion around a natural ready pose.
-_AMP = [18.0, 10.0, 14.0, 16.0, 12.0, 28.0]
-_PERIOD = [13.0, 9.0, 7.0, 11.0, 6.0, 5.0]
-_BIAS = [0.0, -15.0, 75.0, 0.0, 55.0, 0.0]
+# Natural "ready" pose the mock holds until the first target is applied --
+# the URDF's ros2_control initial configuration (elbow and wrist at -90 deg).
+_READY = [0.0, 0.0, -90.0, 0.0, -90.0, 0.0]
 
-# Joint limits (deg) -- matches Indy7 URDF revolute ranges closely enough for
-# the mock to reject clearly out-of-range IK targets.
-_LIMIT = 175.0
+# Seconds to ease from the previous configuration to a newly applied target.
+# Matched to the frontend joint tween so telemetry and the local animation
+# converge on the target together, with no snap when the tween hands back.
+_MOVE_DURATION_S = 1.0
+
+
+def _ease(t: float) -> float:
+    """Cubic ease-in-out on a clamped 0..1 progress value."""
+    t = min(1.0, max(0.0, t))
+    return 4 * t**3 if t < 0.5 else 1 - (-2 * t + 2) ** 3 / 2
 
 
 class MockRobot(RobotService):
     mode = "mock"
 
     def __init__(self) -> None:
-        self._t0 = time.monotonic()
         self._connected = False
-        # After an IK solve the idle motion re-centres on the new joints, so an
-        # applied target actually "sticks" instead of snapping back.
-        self._center = list(_BIAS)
+        # Active move: ease ``_from`` -> ``_target`` starting at ``_move_start``.
+        # Both endpoints equal ``_READY`` initially, so the robot sits still.
+        self._from = list(_READY)
+        self._target = list(_READY)
+        self._move_start = time.monotonic()
 
     async def connect(self) -> None:
         self._connected = True
@@ -47,53 +59,39 @@ class MockRobot(RobotService):
     def connected(self) -> bool:
         return self._connected
 
-    def _joints_at(self, t: float) -> list[float]:
-        return [
-            self._center[i] + 0.5 * _AMP[i] * math.sin(2 * math.pi * t / _PERIOD[i])
-            for i in range(6)
-        ]
+    def _joints_now(self) -> list[float]:
+        frac = _ease((time.monotonic() - self._move_start) / _MOVE_DURATION_S)
+        return [a + (b - a) * frac for a, b in zip(self._from, self._target)]
 
     async def get_joints(self) -> list[float]:
-        return self._joints_at(time.monotonic() - self._t0)
-
-    async def _fk(self, jpos: list[float]) -> list[float]:
-        # Planar 3-link stand-in in the X-Z plane; orientation echoes wrist joints.
-        l1, l2, l3 = 300.0, 250.0, 120.0
-        a1 = math.radians(jpos[1])
-        a2 = a1 + math.radians(jpos[2])
-        a3 = a2 + math.radians(jpos[4])
-        x = l1 * math.cos(a1) + l2 * math.cos(a2) + l3 * math.cos(a3)
-        z = 250.0 + l1 * math.sin(a1) + l2 * math.sin(a2) + l3 * math.sin(a3)
-        y = 2.0 * jpos[0]
-        return [x, y, z, 180.0 - jpos[3], jpos[4] - 20.0, -jpos[0] - 90.0]
+        return self._joints_now()
 
     async def forward_kin(self, jpos: list[float]) -> list[float]:
-        return await self._fk(list(jpos))
+        return kinematics.fk(list(jpos))
+
+    async def home(self) -> list[float]:
+        self._from = self._joints_now()
+        self._target = list(_READY)
+        self._move_start = time.monotonic()
+        return list(_READY)
 
     async def solve_ik(self, tpos: list[float], init_jpos: list[float]) -> list[float]:
-        # No real controller: nudge the seed toward the requested pose so the
-        # rendered model moves, and reject targets outside a plausible envelope.
-        reach = math.sqrt(tpos[0] ** 2 + tpos[1] ** 2 + tpos[2] ** 2)
-        if not 150.0 <= reach <= 1100.0:
-            raise IkFailed(f"target out of reach ({reach:.0f} mm)")
-        seed = list(init_jpos)
-        seed[0] = -(tpos[5] + 90.0)
-        seed[1] = (tpos[2] - 400.0) / 6.0
-        seed[2] = (tpos[0] - 350.0) / 4.0 + 90.0
-        seed[3] = 180.0 - tpos[3]
-        seed[4] = tpos[4] + 20.0
-        if any(abs(v) > _LIMIT for v in seed):
-            raise IkFailed("solution exceeds joint limits")
-        self._center = list(seed)
-        return seed
+        # Real numerical IK against the URDF model; raises IkFailed when the
+        # target is out of reach or the solution breaks a joint limit.
+        solution = kinematics.ik(list(tpos), list(init_jpos))
+        # Begin easing from the live position to the new solution, then hold.
+        self._from = self._joints_now()
+        self._target = list(solution)
+        self._move_start = time.monotonic()
+        return solution
 
     async def get_pose(self) -> PoseDTO:
-        return PoseDTO.from_list(await self._fk(await self.get_joints()))
+        return PoseDTO.from_list(kinematics.fk(await self.get_joints()))
 
     async def stream(self) -> AsyncIterator[TelemetryFrame]:
         period = 1.0 / max(settings.telemetry_hz, 1.0)
         while True:
             q = await self.get_joints()
-            p = await self._fk(q)
+            p = kinematics.fk(q)
             yield TelemetryFrame(q=q, p=p, ts=time.time())
             await asyncio.sleep(period)
