@@ -17,6 +17,48 @@ export class IkError extends Error {
   }
 }
 
+/** Thrown by {@link connectController} / {@link goHome} for an expected,
+ *  user-facing failure (controller unreachable, motion not permitted). */
+export class ApiError extends Error {
+  detail: string
+  constructor(detail: string) {
+    super(detail)
+    this.name = 'ApiError'
+    this.detail = detail
+  }
+}
+
+async function postJson(path: string, body?: unknown): Promise<unknown> {
+  const r = await fetch(path, {
+    method: 'POST',
+    headers: body === undefined ? undefined : { 'content-type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+  if (!r.ok) {
+    const payload = await r.json().catch(() => null)
+    throw new ApiError(payload?.detail?.detail ?? `${path} ${r.status}`)
+  }
+  return r.json()
+}
+
+/** Dial the real IndyDCP3 controller (simulation mode). Throws {@link ApiError}
+ *  when it cannot be reached — the twin stays on the mock. */
+export function connectController(host: string): Promise<Health> {
+  return postJson('/api/connect', { host }) as Promise<Health>
+}
+
+/** Drop the controller connection and fall back to the offline mock. */
+export function disconnectController(): Promise<Health> {
+  return postJson('/api/disconnect') as Promise<Health>
+}
+
+/** Send the twin to its home pose; resolves to the home joint angles (deg).
+ *  Throws {@link ApiError} against a real controller (P0 never commands motion). */
+export async function goHome(): Promise<number[]> {
+  const body = (await postJson('/api/home')) as { jpos: number[] }
+  return body.jpos
+}
+
 export async function getHealth(): Promise<Health> {
   const r = await fetch('/api/health')
   if (!r.ok) throw new Error(`health ${r.status}`)

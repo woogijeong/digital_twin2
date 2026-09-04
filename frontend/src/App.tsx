@@ -30,7 +30,7 @@ export default function App() {
         color: T.text,
       }}
     >
-      <StatusBar health={health} link={link} />
+      <StatusBar health={health} link={link} onHealthChange={setHealth} />
 
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
         <div
@@ -71,6 +71,7 @@ export default function App() {
             pose={pose}
             jointsDeg={jointsDeg}
             stale={stale}
+            mode={health?.mode ?? null}
             onApply={(jpos) => animateTo(jpos)}
           />
           <JointBars q={jointsDeg} />

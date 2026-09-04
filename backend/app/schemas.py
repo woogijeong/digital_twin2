@@ -40,6 +40,12 @@ class IkResponse(BaseModel):
     jpos: list[float]
 
 
+class ConnectRequest(BaseModel):
+    host: str | None = Field(
+        default=None, description="controller address to dial; defaults to INDY_HOST"
+    )
+
+
 class StateResponse(BaseModel):
     q: list[float]
     p: list[float]
