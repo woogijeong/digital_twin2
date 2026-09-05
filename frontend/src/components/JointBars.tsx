@@ -2,7 +2,14 @@ import type { ReactNode } from 'react'
 import { JOINT_LIMIT_DEG, T } from '../theme'
 
 /** J1..J6 track bars. `q` is degrees, joint0..joint5. */
-export default function JointBars({ q }: { q: number[] }) {
+export default function JointBars({
+  q,
+  warnJoints,
+}: {
+  q: number[]
+  /** Joint indices near their hardware limit — drawn amber instead of teal. */
+  warnJoints?: Set<number>
+}) {
   return (
     <section>
       <SectionHead>JOINTS · deg</SectionHead>
@@ -34,7 +41,7 @@ export default function JointBars({ q }: { q: number[] }) {
                   style={{
                     width: `${Math.max(0, Math.min(100, pct))}%`,
                     height: '100%',
-                    background: T.teal,
+                    background: warnJoints?.has(i) ? T.amber : T.teal,
                     borderRadius: 3,
                   }}
                 />

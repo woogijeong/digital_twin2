@@ -12,12 +12,19 @@ export interface LoadedRobot {
   object: THREE.Object3D
   /** Drive the six revolute joints. `q` is in degrees, joint0..joint5 order. */
   setJoints(q: number[]): void
-  /** Mount an end-effector on the flange (or `none` to bare it). */
-  setTool(tool: ToolId): void
+  /** Mount an end-effector on the flange (or `none` to bare it), optionally
+   *  tinting its body material. */
+  setTool(tool: ToolId, color?: number): void
+  /** Recolor the currently-mounted tool's body material live, without
+   *  rebuilding it. No-op if no tool (or `none`) is mounted. */
+  setToolColor(color: number): void
   /** Gripper only: slide the fingers (animated). No-op for other tools. */
   setGripperOpen(open: boolean): void
   /** World-space position of the working point (tool tip, or bare TCP). */
   tcpWorldPosition(target: THREE.Vector3): THREE.Vector3
+  /** Reparent `obj` onto the current working point (tool tip, or bare flange
+   *  TCP) while preserving its world transform — visualizes a pick. */
+  attachPayload(obj: THREE.Object3D): void
   dispose(): void
 }
 
@@ -74,18 +81,21 @@ export function loadIndy7(url = '/robot/indy7.urdf'): Promise<LoadedRobot> {
             })
             robot.updateMatrixWorld(true)
           },
-          setTool(next) {
+          setTool(next, color) {
             if (tool) {
               tool.group.parent?.remove(tool.group)
               tool.dispose()
               tool = null
             }
             if (next !== 'none' && flange) {
-              tool = buildTool(next)
+              tool = buildTool(next, color)
               tool.setOpen(gripFrac)
               flange.add(tool.group)
             }
             robot.updateMatrixWorld(true)
+          },
+          setToolColor(color) {
+            tool?.setColor(color)
           },
           setGripperOpen(open) {
             gripTarget = open ? 1 : 0
@@ -95,6 +105,10 @@ export function loadIndy7(url = '/robot/indy7.urdf'): Promise<LoadedRobot> {
             if (tool) return tool.tip.getWorldPosition(target)
             if (tcp) return tcp.getWorldPosition(target)
             return target.copy(robot.position)
+          },
+          attachPayload(obj) {
+            const point = (tool?.tip ?? tcp ?? robot) as THREE.Object3D
+            point.attach(obj)
           },
           dispose() {
             if (gripRaf) cancelAnimationFrame(gripRaf)

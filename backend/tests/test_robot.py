@@ -24,6 +24,25 @@ async def test_mock_stream_yields_frames():
     await gen.aclose()
 
 
+async def test_mock_stream_reports_manipulability_and_no_error():
+    robot = MockRobot()
+    await robot.connect()
+    gen = robot.stream()
+    frame = await anext(gen)
+    assert frame.error is None
+    assert frame.manipulability > 0
+    await gen.aclose()
+
+
+async def test_mock_gripper_and_suction_are_harmless_no_ops():
+    robot = MockRobot()
+    await robot.set_gripper(True)
+    await robot.set_gripper(False)
+    await robot.set_suction(True)
+    await robot.set_suction(False)
+    # no exception means success -- the mock has no physical I/O to check
+
+
 async def test_mock_ik_rejects_unreachable():
     robot = MockRobot()
     with pytest.raises(IkFailed):

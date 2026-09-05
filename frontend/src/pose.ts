@@ -44,6 +44,14 @@ function mul(a: Mat3, b: Mat3): Mat3 {
   return out
 }
 
+function mulVec(m: Mat3, v: readonly [number, number, number]): [number, number, number] {
+  return [
+    m[0] * v[0] + m[1] * v[1] + m[2] * v[2],
+    m[3] * v[0] + m[4] * v[1] + m[5] * v[2],
+    m[6] * v[0] + m[7] * v[1] + m[8] * v[2],
+  ]
+}
+
 /** Resolve a relative target (deltas along the base-frame axes, rotations about
  *  the base-frame axes) against the current pose into an absolute base-frame
  *  pose ready for IK. */
@@ -54,4 +62,17 @@ export function resolveRelative(current: PoseTuple, delta: PoseTuple): PoseTuple
   )
   const [rx, ry, rz] = eulerFromMat(rNew)
   return [current[0] + delta[0], current[1] + delta[1], current[2] + delta[2], rx, ry, rz]
+}
+
+/** Resolve a relative target against the current pose, but with the delta
+ *  expressed in the *tool's own* frame instead of the base frame: a Z offset
+ *  moves along whichever way the tool is currently pointing (approach /
+ *  retract), and rotation deltas turn about the tool's own axes rather than
+ *  the base frame's. */
+export function resolveToolRelative(current: PoseTuple, delta: PoseTuple): PoseTuple {
+  const rCurrent = matFromEuler(current[3], current[4], current[5])
+  const rNew = mul(rCurrent, matFromEuler(delta[3], delta[4], delta[5]))
+  const [rx, ry, rz] = eulerFromMat(rNew)
+  const [dx, dy, dz] = mulVec(rCurrent, [delta[0], delta[1], delta[2]])
+  return [current[0] + dx, current[1] + dy, current[2] + dz, rx, ry, rz]
 }

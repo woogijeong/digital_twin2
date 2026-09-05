@@ -37,6 +37,11 @@ _FLANGE_TCP_M = 0.06
 # URDF revolute limits, joint0..joint5, in degrees (±175° for J1-J5, ±215° J6).
 JOINT_LIMITS_DEG: list[float] = [175.0, 175.0, 175.0, 175.0, 175.0, 215.0]
 
+# Tool tip must stay above the base-frame floor (Z=0) by at least this much;
+# below it the tool would physically collide with the table even though the
+# math is solvable.
+FLOOR_CLEARANCE_MM = 5.0
+
 _IDENTITY = (1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
 
 
@@ -240,6 +245,10 @@ def ik(
     on a distant arm branch can still miss. Raises :class:`IkFailed` when nothing
     converges (target out of reach) or the solution breaks a joint limit.
     """
+    if target_pose[2] < FLOOR_CLEARANCE_MM:
+        raise IkFailed(
+            f"target z={target_pose[2]:.0f}mm is below the floor clearance ({FLOOR_CLEARANCE_MM:.0f}mm)"
+        )
     tgt_pos = (target_pose[0] / 1000.0, target_pose[1] / 1000.0, target_pose[2] / 1000.0)
     tgt_rot = _rpy_matrix(*(math.radians(v) for v in target_pose[3:6]))
     tcp_z = tcp_offset_mm / 1000.0
@@ -278,3 +287,32 @@ def ik(
         if abs(v) > lim + 1e-6:
             raise IkFailed(f"solution exceeds joint {i + 1} limit (±{lim:.0f}°)")
     return q_deg
+
+
+def _det6(m: list[list[float]]) -> float:
+    """Determinant of a 6x6 matrix via Gaussian elimination with partial pivoting."""
+    a = [row[:] for row in m]
+    det = 1.0
+    for col in range(6):
+        piv = max(range(col, 6), key=lambda r: abs(a[r][col]))
+        if abs(a[piv][col]) < 1e-14:
+            return 0.0
+        if piv != col:
+            a[col], a[piv] = a[piv], a[col]
+            det = -det
+        det *= a[col][col]
+        inv = 1.0 / a[col][col]
+        for r in range(col + 1, 6):
+            f = a[r][col] * inv
+            if f:
+                for c in range(col, 6):
+                    a[r][c] -= f * a[col][c]
+    return det
+
+
+def manipulability(q_deg: list[float], tcp_offset_mm: float = _FLANGE_TCP_M * 1000.0) -> float:
+    """Yoshikawa manipulability index -- for this 6-DOF arm's square Jacobian,
+    sqrt(det(J·Jᵀ)) reduces to |det(J)|. ~0 at a singularity (the arm loses
+    freedom of motion in some direction); larger away from one."""
+    j = _jacobian([math.radians(v) for v in q_deg], tcp_offset_mm / 1000.0)
+    return abs(_det6(j))

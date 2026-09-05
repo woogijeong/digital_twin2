@@ -4,6 +4,8 @@ export interface TelemetryFrame {
   q: number[]
   p: number[]
   ts: number
+  manipulability: number
+  error: string | null
 }
 
 export type LinkState = 'connecting' | 'linked' | 'reconnecting'

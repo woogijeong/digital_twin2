@@ -1,5 +1,5 @@
 import { useState, type CSSProperties } from 'react'
-import { T } from '../theme'
+import { T, type ViewportTheme } from '../theme'
 import { ApiError, connectController, disconnectController, type Health } from '../api/client'
 import type { LinkState } from '../hooks/useTelemetry'
 
@@ -8,9 +8,21 @@ interface Props {
   link: LinkState
   /** Called with the fresh health after a connect / disconnect. */
   onHealthChange: (h: Health) => void
+  theme: 'dark' | 'light'
+  onToggleTheme: () => void
+  viewportTheme: ViewportTheme
+  onToggleViewportTheme: () => void
 }
 
-export default function StatusBar({ health, link, onHealthChange }: Props) {
+export default function StatusBar({
+  health,
+  link,
+  onHealthChange,
+  theme,
+  onToggleTheme,
+  viewportTheme,
+  onToggleViewportTheme,
+}: Props) {
   const mock = health?.mode === 'mock'
   const [hostEdit, setHostEdit] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -72,16 +84,32 @@ export default function StatusBar({ health, link, onHealthChange }: Props) {
 
         {err && <span style={errText}>{err}</span>}
 
-        <LinkBadge link={link} />
+        <button onClick={onToggleTheme} title="toggle light / dark theme" style={connBtn}>
+          {theme === 'dark' ? '☀ LIGHT' : '☾ DARK'}
+        </button>
+
+        <button
+          onClick={onToggleViewportTheme}
+          title="toggle the 3D viewport background"
+          style={connBtn}
+        >
+          {viewportTheme === 'black' ? '⬜ GRAY BG' : '⬛ BLACK BG'}
+        </button>
+
+        <LinkBadge link={link} real={health?.mode === 'real' && health.connected} />
       </div>
     </header>
   )
 }
 
-function LinkBadge({ link }: { link: LinkState }) {
+/** "LINKED" means connected to the real controller -- a mock session never
+ *  claims to be linked, even while its (own, offline) telemetry is flowing. */
+function LinkBadge({ link, real }: { link: LinkState; real: boolean }) {
   const map = {
     connecting: { text: 'CONNECTING', color: T.muted, blink: false },
-    linked: { text: 'LINKED', color: T.green, blink: false },
+    linked: real
+      ? { text: 'LINKED', color: T.green, blink: false }
+      : { text: 'NOT LINKED', color: T.muted, blink: false },
     reconnecting: { text: 'RECONNECTING', color: T.amber, blink: true },
   }[link]
 

@@ -15,11 +15,13 @@ from app.robot.indy import IndyDCP3Robot
 from app.robot.mock import MockRobot
 from app.schemas import (
     ConnectRequest,
+    GripperRequest,
     HealthResponse,
     IkRequest,
     IkResponse,
     PoseDTO,
     StateResponse,
+    SuctionRequest,
     ToolRequest,
 )
 
@@ -130,3 +132,26 @@ async def tool(request: Request, body: ToolRequest) -> HealthResponse:
         ) from exc
     request.app.state.active_tool = body.tool
     return _health(request)
+
+
+@router.post("/recover", response_model=HealthResponse)
+async def recover(request: Request) -> HealthResponse:
+    try:
+        await _robot(request).recover()
+    except RobotUnavailable as exc:
+        raise HTTPException(
+            status_code=502, detail={"error": "recover_failed", "detail": str(exc)}
+        ) from exc
+    return _health(request)
+
+
+@router.post("/gripper")
+async def gripper(request: Request, body: GripperRequest) -> dict:
+    await _robot(request).set_gripper(body.open)
+    return {"status": "ok", "open": body.open}
+
+
+@router.post("/suction")
+async def suction(request: Request, body: SuctionRequest) -> dict:
+    await _robot(request).set_suction(body.on)
+    return {"status": "ok", "on": body.on}

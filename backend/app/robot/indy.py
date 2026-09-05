@@ -22,19 +22,33 @@ from app.robot.base import (
 from app.robot.tools import TOOL_EXTRA_MM, tool_frame_fpos
 from app.schemas import PoseDTO, TelemetryFrame
 
-# P0 is read + kinematics + the TCP tool frame. Every SDK call goes through
-# ``_call`` and only these may pass -- so no code path (or future edit) can
-# command physical motion (``movej`` / ``movel`` / teleop), whatever string it
-# hands to ``_call``. ``set_tool_frame`` is a TCP-reference config, not motion.
+# P0 is read + kinematics + the TCP tool frame + fault recovery. Every SDK
+# call goes through ``_call`` and only these may pass -- so no code path (or
+# future edit) can command physical motion (``movej`` / ``movel`` / teleop),
+# whatever string it hands to ``_call``. ``set_tool_frame`` is a TCP-reference
+# config, not motion; ``recover`` only clears a fault flag (e.g. after a
+# collision stop) -- it does not move the robot either; ``set_do`` toggles
+# end-effector I/O (the gripper/suction solenoids) -- it actuates the *tool*,
+# not the arm, so it's not motion either.
 _ALLOWED_SDK_CALLS = frozenset(
     {
         "get_control_data",
+        "get_control_state",
         "inverse_kin",
         "forward_kin",
         "set_simulation_mode",
         "set_tool_frame",
+        "recover",
+        "set_do",
     }
 )
+
+# OpState codes (neuromeka.enums.OpState) that mean the controller has
+# faulted and needs `recover()` before it will report anything useful again.
+_FAULT_MESSAGES = {
+    2: "SAFETY VIOLATION",  # OpState.VIOLATE
+    8: "COLLISION DETECTED",  # OpState.COLLISION
+}
 
 
 class IndyDCP3Robot(RobotService):
@@ -122,9 +136,26 @@ class IndyDCP3Robot(RobotService):
         await self._call("set_tool_frame", tool_frame_fpos(tool))
         self.tool = tool
 
+    async def set_gripper(self, open: bool) -> None:
+        # DO0/DO1 are a latching dual-solenoid pair -- exactly one is HIGH.
+        await self._call("set_do", [(0, open), (1, not open)])
+
+    async def set_suction(self, on: bool) -> None:
+        await self._call("set_do", [(2, on)])
+
+    async def recover(self) -> None:
+        await self._call("recover")
+
     async def stream(self) -> AsyncIterator[TelemetryFrame]:
         period = 1.0 / max(settings.telemetry_hz, 1.0)
         while True:
             data = await self._call("get_control_data")
-            yield TelemetryFrame(q=list(data["q"]), p=list(data["p"]), ts=time.time())
+            state = await self._call("get_control_state")
+            yield TelemetryFrame(
+                q=list(data["q"]),
+                p=list(data["p"]),
+                ts=time.time(),
+                manipulability=float(state.get("manipulability", 0.0)),
+                error=_FAULT_MESSAGES.get(int(data.get("op_state", 0))),
+            )
             await asyncio.sleep(period)

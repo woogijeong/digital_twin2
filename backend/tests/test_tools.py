@@ -35,7 +35,7 @@ def test_select_tool_shifts_the_reported_pose(client):
     assert r.json()["tool"] == "suction"
 
     pose_suction = client.get("/api/pose").json()
-    # the ready pose points the tool straight down: +92 mm of tool -> -92 mm of Z
+    # the ready pose points the tool straight down: extra tool length -> equal drop in Z
     delta = tcp_offset_mm("suction") - tcp_offset_mm("none")
     assert abs((pose_none["z"] - pose_suction["z"]) - delta) < 0.05
     assert client.get("/api/health").json()["tool"] == "suction"
@@ -57,3 +57,22 @@ def test_connecting_pushes_the_tool_frame_to_the_controller(client, monkeypatch)
 
     indy.set_tool_frame.assert_called_with(tool_frame_fpos("gripper"))
     assert client.get("/api/health").json()["tool"] == "gripper"
+
+
+def test_gripper_and_suction_toggle_the_right_digital_outputs(client, monkeypatch):
+    indy = MagicMock()
+    indy.get_control_data.return_value = {"q": [0.0] * 6, "p": [0.0] * 6, "op_state": 5}
+    indy.get_control_state.return_value = {"manipulability": 0.5}
+    module = MagicMock()
+    module.IndyDCP3.return_value = indy
+    monkeypatch.setitem(sys.modules, "neuromeka", module)
+    assert client.post("/api/connect", json={"host": "10.0.0.9"}).status_code == 200
+
+    assert client.post("/api/gripper", json={"open": True}).status_code == 200
+    indy.set_do.assert_called_with([(0, True), (1, False)])
+
+    assert client.post("/api/gripper", json={"open": False}).status_code == 200
+    indy.set_do.assert_called_with([(0, False), (1, True)])
+
+    assert client.post("/api/suction", json={"on": True}).status_code == 200
+    indy.set_do.assert_called_with([(2, True)])

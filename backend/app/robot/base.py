@@ -83,5 +83,26 @@ class RobotService(abc.ABC):
         """
 
     @abc.abstractmethod
+    async def set_gripper(self, open: bool) -> None:
+        """Actuate the gripper's open/close solenoids (DO0=open, DO1=close on
+        the real controller). No-op for services with no physical gripper
+        (the offline mock, whose gripper animation is driven purely
+        client-side)."""
+
+    @abc.abstractmethod
+    async def set_suction(self, on: bool) -> None:
+        """Actuate the suction valve (DO2 on the real controller). No-op for
+        the offline mock."""
+
+    @abc.abstractmethod
+    async def recover(self) -> None:
+        """Clear an active controller fault (e.g. a collision/violation stop).
+
+        Not a motion command -- it only resets the fault flag so reads and
+        kinematics work again. A no-op for services with no fault state (the
+        offline mock).
+        """
+
+    @abc.abstractmethod
     def stream(self) -> AsyncIterator[TelemetryFrame]:
         """Infinite async iterator of telemetry frames at the configured rate."""

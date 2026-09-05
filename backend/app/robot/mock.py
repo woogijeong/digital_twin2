@@ -85,6 +85,15 @@ class MockRobot(RobotService):
             raise ValueError(f"unknown tool {tool!r}")
         self.tool = tool
 
+    async def set_gripper(self, open: bool) -> None:
+        pass  # the mock's gripper animation is purely visual, driven client-side
+
+    async def set_suction(self, on: bool) -> None:
+        pass
+
+    async def recover(self) -> None:
+        pass  # the mock has no fault state to clear
+
     async def solve_ik(self, tpos: list[float], init_jpos: list[float]) -> list[float]:
         # Real numerical IK against the URDF model; raises IkFailed when the
         # target is out of reach or the solution breaks a joint limit.
@@ -103,5 +112,11 @@ class MockRobot(RobotService):
         while True:
             q = await self.get_joints()
             p = kinematics.fk(q, self._tcp())
-            yield TelemetryFrame(q=q, p=p, ts=time.time())
+            yield TelemetryFrame(
+                q=q,
+                p=p,
+                ts=time.time(),
+                manipulability=kinematics.manipulability(q, self._tcp()),
+                error=None,
+            )
             await asyncio.sleep(period)

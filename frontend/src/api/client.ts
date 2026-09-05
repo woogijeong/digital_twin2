@@ -61,11 +61,29 @@ export function setTool(tool: ToolId): Promise<Health> {
   return postJson('/api/tool', { tool }) as Promise<Health>
 }
 
+/** Actuate the gripper's open/close solenoids on the real controller (DO0/DO1).
+ *  No-op on the mock's side, but still calls through so the real controller
+ *  stays in sync when connected. */
+export function setGripperDo(open: boolean): Promise<void> {
+  return postJson('/api/gripper', { open }) as Promise<void>
+}
+
+/** Actuate the suction valve on the real controller (DO2). */
+export function setSuctionDo(on: boolean): Promise<void> {
+  return postJson('/api/suction', { on }) as Promise<void>
+}
+
 /** Send the twin to its home pose; resolves to the home joint angles (deg).
  *  Throws {@link ApiError} against a real controller (P0 never commands motion). */
 export async function goHome(): Promise<number[]> {
   const body = (await postJson('/api/home')) as { jpos: number[] }
   return body.jpos
+}
+
+/** Clear an active controller fault (e.g. after a collision stop). Not a
+ *  motion command. Throws {@link ApiError} if the call itself fails. */
+export function recoverController(): Promise<Health> {
+  return postJson('/api/recover') as Promise<Health>
 }
 
 export async function getHealth(): Promise<Health> {

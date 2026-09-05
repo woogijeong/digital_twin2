@@ -13,7 +13,8 @@
     "test:api": "uv run --directory backend pytest -q",
     "test:web": "pnpm --dir frontend build",
     "test:e2e": "pnpm --dir frontend exec playwright test",
-    "demo:gif": "node scripts/make-demo-gif.mjs"
+    "demo:gif": "node scripts/make-demo-gif.mjs demo.spec.ts demo.gif",
+    "demo:pickplace:gif": "node scripts/make-demo-gif.mjs demo-pickplace.spec.ts demo-pickplace.gif"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"

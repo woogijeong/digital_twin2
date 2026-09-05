@@ -9,7 +9,8 @@ from unittest.mock import MagicMock
 
 def _fake_neuromeka(monkeypatch) -> MagicMock:
     indy = MagicMock()
-    indy.get_control_data.return_value = {"q": [0.0] * 6, "p": [0.0] * 6}
+    indy.get_control_data.return_value = {"q": [0.0] * 6, "p": [0.0] * 6, "op_state": 5}
+    indy.get_control_state.return_value = {"manipulability": 0.5}
     module = MagicMock()
     module.IndyDCP3.return_value = indy
     monkeypatch.setitem(sys.modules, "neuromeka", module)
@@ -69,3 +70,16 @@ def test_home_against_the_real_controller_is_409(client, monkeypatch):
     r = client.post("/api/home")
     assert r.status_code == 409
     assert r.json()["detail"]["error"] == "motion_not_permitted"
+
+
+def test_recover_clears_a_fault_on_the_real_controller(client, monkeypatch):
+    indy = _fake_neuromeka(monkeypatch)
+    assert client.post("/api/connect", json={"host": "10.0.0.9"}).status_code == 200
+
+    r = client.post("/api/recover")
+    assert r.status_code == 200
+    indy.recover.assert_called_once()
+
+
+def test_recover_on_mock_is_a_harmless_no_op(client):
+    assert client.post("/api/recover").status_code == 200

@@ -1,3 +1,53 @@
+/* Bare :root and [data-theme='dark'] carry identical values, so scoping
+   data-theme="dark" onto the viewport re-pins that subtree to the dark palette
+   even while the page is in light mode. */
+:root,
+[data-theme='dark'] {
+  --twin-bg: #0d1012;
+  --twin-panel: #12171a;
+  --twin-border: #232c31;
+  --twin-border-input: #2b363b;
+  --twin-text: #cdd6d9;
+  --twin-muted: #7c8a90;
+  --twin-teal: #46d6c0;
+  --twin-on-teal: #08211f;
+  --twin-teal-track: #1c2327;
+  --twin-amber: #f2b03d;
+  --twin-green: #4ade80;
+  --twin-badge-sim: #6a5326;
+  --twin-badge-mock: #5a6b33;
+  --twin-hint: #5a666b;
+  --twin-axis-x: #e0574b;
+  --twin-axis-y: #5b9bd5;
+  --twin-axis-z: #4ade80;
+  --twin-viewport-grid: rgba(70, 214, 192, 0.055);
+  --twin-viewport-bg-a: #16201f;
+  --twin-viewport-bg-b: #0a0d0f;
+}
+
+[data-theme='light'] {
+  --twin-bg: #f4f6f5;
+  --twin-panel: #ffffff;
+  --twin-border: #dde3e2;
+  --twin-border-input: #c9d2d1;
+  --twin-text: #1b2426;
+  --twin-muted: #5c6b6e;
+  --twin-teal: #0f8f7d;
+  --twin-on-teal: #ffffff;
+  --twin-teal-track: #d9ece8;
+  --twin-amber: #b8790f;
+  --twin-green: #1f9d55;
+  --twin-badge-sim: #e8c98a;
+  --twin-badge-mock: #b8d190;
+  --twin-hint: #7c8a8d;
+  --twin-axis-x: #c23f33;
+  --twin-axis-y: #2f6fa8;
+  --twin-axis-z: #1f9d55;
+  --twin-viewport-grid: rgba(15, 143, 125, 0.08);
+  --twin-viewport-bg-a: #e4ece9;
+  --twin-viewport-bg-b: #f4f6f5;
+}
+
 * { box-sizing: border-box; }
 
 html, body, #root {
@@ -6,8 +56,8 @@ html, body, #root {
 }
 
 body {
-  background: #0d1012;
-  color: #cdd6d9;
+  background: var(--twin-bg);
+  color: var(--twin-text);
   font-family: 'IBM Plex Sans', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;

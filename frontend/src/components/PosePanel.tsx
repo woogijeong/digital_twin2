@@ -1,7 +1,7 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 import { AXIS_LABELS, AXIS_UNITS, T } from '../theme'
-import { ApiError, IkError, goHome, solveIk, type PoseTuple } from '../api/client'
-import { resolveRelative } from '../pose'
+import { ApiError, IkError, goHome, recoverController, solveIk, type PoseTuple } from '../api/client'
+import { resolveRelative, resolveToolRelative } from '../pose'
 import { fmt1 } from '../format'
 import { SectionHead } from './JointBars'
 
@@ -16,49 +16,72 @@ interface Props {
   onApply: (jpos: number[]) => void
   /** Live robot mode — RESET is disabled against the real controller. */
   mode: 'real' | 'mock' | null
+  /** Active controller fault from live telemetry, if any. */
+  error: string | null
 }
 
 const ZEROS = ['0', '0', '0', '0', '0', '0']
 
-const MODES: Array<{ label: string; rel: boolean; title: string }> = [
-  { label: 'ABS', rel: false, title: 'absolute pose in the base frame' },
-  { label: 'REL', rel: true, title: 'offset from the current pose' },
+type Frame = 'abs' | 'rel' | 'tool'
+
+const FRAMES: Array<{ label: string; value: Frame; title: string }> = [
+  { label: 'ABS', value: 'abs', title: 'absolute pose in the base frame' },
+  { label: 'REL', value: 'rel', title: 'offset from the current pose, along the base-frame axes' },
+  { label: 'TOOL', value: 'tool', title: "offset from the current pose, along the tool's own axes (approach / retract)" },
 ]
 
-export default function PosePanel({ pose, jointsDeg, stale, onApply, mode }: Props) {
+function resolveInFrame(frame: Frame, current: PoseTuple, delta: PoseTuple): PoseTuple {
+  return frame === 'tool' ? resolveToolRelative(current, delta) : resolveRelative(current, delta)
+}
+
+export default function PosePanel({ pose, jointsDeg, stale, onApply, mode, error }: Props) {
   const [target, setTarget] = useState<string[] | null>(null)
-  const [relative, setRelative] = useState(false)
+  const [frame, setFrame] = useState<Frame>('abs')
   const [busy, setBusy] = useState(false)
   const [homing, setHoming] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const [recovering, setRecovering] = useState(false)
+  const [recoverErr, setRecoverErr] = useState<string | null>(null)
+
+  const recover = async () => {
+    setRecovering(true)
+    setRecoverErr(null)
+    try {
+      await recoverController()
+    } catch (e) {
+      setRecoverErr(e instanceof ApiError ? e.detail : 'recover failed')
+    } finally {
+      setRecovering(false)
+    }
+  }
 
   // In absolute mode, seed the target inputs once from the first live pose.
-  // After that (and always in relative mode) they are the user's to edit.
+  // After that (and in the relative/tool frames) they are the user's to edit.
   useEffect(() => {
-    if (target === null && pose && !relative) setTarget(pose.map((v) => v.toFixed(1)))
-  }, [pose, target, relative])
+    if (target === null && pose && frame === 'abs') setTarget(pose.map((v) => v.toFixed(1)))
+  }, [pose, target, frame])
 
-  const fields = target ?? (relative ? ZEROS : ['', '', '', '', '', ''])
+  const fields = target ?? (frame === 'abs' ? ['', '', '', '', '', ''] : ZEROS)
 
   const setField = (i: number, v: string) =>
     setTarget((t) => (t ?? fields).map((cur, j) => (j === i ? v : cur)))
 
   const liveFields = () => (pose ? pose.map((v) => v.toFixed(1)) : null)
 
-  const setMode = (rel: boolean) => {
-    setRelative(rel)
+  const changeFrame = (next: Frame) => {
+    setFrame(next)
     setErr(null)
-    setTarget(rel ? [...ZEROS] : liveFields())
+    setTarget(next === 'abs' ? liveFields() : [...ZEROS])
   }
 
-  // SYNC (absolute) copies the live pose in; ZERO (relative) clears the deltas.
-  const resetFields = () => setTarget(relative ? [...ZEROS] : liveFields())
+  // SYNC (absolute) copies the live pose in; ZERO (relative/tool) clears the deltas.
+  const resetFields = () => setTarget(frame === 'abs' ? liveFields() : [...ZEROS])
 
   const nums = fields.map(Number)
   const allNumeric = fields.every((f) => f.trim() !== '' && !Number.isNaN(Number(f)))
   const resolved: PoseTuple | null =
-    relative && pose && allNumeric
-      ? resolveRelative(pose as PoseTuple, nums as PoseTuple)
+    frame !== 'abs' && pose && allNumeric
+      ? resolveInFrame(frame, pose as PoseTuple, nums as PoseTuple)
       : null
 
   const submit = async () => {
@@ -67,12 +90,12 @@ export default function PosePanel({ pose, jointsDeg, stale, onApply, mode }: Pro
       return
     }
     let tpos = nums as PoseTuple
-    if (relative) {
+    if (frame !== 'abs') {
       if (!pose) {
         setErr('waiting for live pose')
         return
       }
-      tpos = resolveRelative(pose as PoseTuple, nums as PoseTuple)
+      tpos = resolveInFrame(frame, pose as PoseTuple, nums as PoseTuple)
     }
     setBusy(true)
     setErr(null)
@@ -119,13 +142,13 @@ export default function PosePanel({ pose, jointsDeg, stale, onApply, mode }: Pro
           <SectionHead>TARGET POSE</SectionHead>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={toggleWrap} role="group" aria-label="target coordinate mode">
-              {MODES.map(({ label, rel, title }) => (
+              {FRAMES.map(({ label, value, title }) => (
                 <button
                   key={label}
-                  onClick={() => setMode(rel)}
-                  aria-pressed={relative === rel}
+                  onClick={() => changeFrame(value)}
+                  aria-pressed={frame === value}
                   title={title}
-                  style={{ ...toggleBtn, ...(relative === rel ? toggleBtnOn : null) }}
+                  style={{ ...toggleBtn, ...(frame === value ? toggleBtnOn : null) }}
                 >
                   {label}
                 </button>
@@ -134,9 +157,9 @@ export default function PosePanel({ pose, jointsDeg, stale, onApply, mode }: Pro
             <button
               onClick={resetFields}
               style={syncBtn}
-              title={relative ? 'zero all offsets' : 'copy live pose into target'}
+              title={frame === 'abs' ? 'copy live pose into target' : 'zero all offsets'}
             >
-              {relative ? '⟲ ZERO' : '⟲ SYNC'}
+              {frame === 'abs' ? '⟲ SYNC' : '⟲ ZERO'}
             </button>
           </div>
         </div>
@@ -144,7 +167,7 @@ export default function PosePanel({ pose, jointsDeg, stale, onApply, mode }: Pro
           {AXIS_LABELS.map((label, i) => (
             <label key={label} style={{ display: 'block' }}>
               <span style={inputLabel}>
-                {relative ? 'Δ' : ''}
+                {frame !== 'abs' ? 'Δ' : ''}
                 {label} {AXIS_UNITS[i]}
               </span>
               <input
@@ -156,11 +179,11 @@ export default function PosePanel({ pose, jointsDeg, stale, onApply, mode }: Pro
             </label>
           ))}
         </div>
-        {relative && (
+        {frame !== 'abs' && (
           <div style={resolvedHint}>
             {resolved
               ? `→ abs [ ${fmt1(resolved[0])}, ${fmt1(resolved[1])}, ${fmt1(resolved[2])} ] mm`
-              : '→ offset from the live pose'}
+              : `→ offset from the live pose${frame === 'tool' ? ', along the tool axes' : ''}`}
           </div>
         )}
         <button onClick={submit} disabled={busy} style={{ ...applyBtn, opacity: busy ? 0.6 : 1 }}>
@@ -178,6 +201,15 @@ export default function PosePanel({ pose, jointsDeg, stale, onApply, mode }: Pro
         >
           {homing ? 'RESETTING…' : '⌂ RESET TO HOME'}
         </button>
+        {error && (
+          <div style={faultBanner}>
+            <div style={faultText}>⚠ {error}</div>
+            <button onClick={recover} disabled={recovering} style={recoverBtn}>
+              {recovering ? 'RECOVERING…' : '⟲ RECOVER'}
+            </button>
+            {recoverErr && <div style={faultText}>recover failed: {recoverErr}</div>}
+          </div>
+        )}
         {err && (
           <div
             style={{
@@ -284,6 +316,31 @@ const applyBtn: CSSProperties = {
   fontWeight: 600,
   fontSize: 13,
   letterSpacing: '0.14em',
+}
+const faultBanner: CSSProperties = {
+  marginTop: 8,
+  padding: 10,
+  border: `1px solid ${T.amber}`,
+  borderRadius: 8,
+  background: 'rgba(242,176,61,0.08)',
+}
+const faultText: CSSProperties = {
+  fontFamily: T.fontMono,
+  fontSize: 11,
+  color: T.amber,
+  marginBottom: 8,
+}
+const recoverBtn: CSSProperties = {
+  width: '100%',
+  padding: 9,
+  background: 'transparent',
+  color: T.amber,
+  border: `1px solid ${T.amber}`,
+  borderRadius: 8,
+  fontFamily: T.fontMono,
+  fontSize: 11,
+  letterSpacing: '0.12em',
+  cursor: 'pointer',
 }
 const homeBtn: CSSProperties = {
   marginTop: 8,

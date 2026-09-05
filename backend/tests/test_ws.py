@@ -9,7 +9,7 @@ import time
 def test_frame_shape(client):
     with client.websocket_connect("/ws/telemetry") as ws:
         frame = json.loads(ws.receive_text())
-    assert set(frame) == {"q", "p", "ts"}
+    assert set(frame) == {"q", "p", "ts", "manipulability", "error"}
     assert len(frame["q"]) == 6 and len(frame["p"]) == 6
 
 

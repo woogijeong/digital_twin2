@@ -6,8 +6,8 @@ import type { ToolId } from '../api/client'
  *  marker sits where telemetry says the pose is. */
 export const TOOL_TIP_M: Record<ToolId, number> = {
   none: 0.06,
-  suction: 0.135,
-  gripper: 0.175,
+  suction: 0.21,
+  gripper: 0.11,
 }
 
 // Geometry is built in the flange (link6) local frame; the flange face sits a
@@ -20,11 +20,27 @@ export interface ToolMesh {
   tip: THREE.Object3D
   /** Gripper only: 0 = closed, 1 = fully open. */
   setOpen(frac: number): void
+  /** Recolor the whole tool, body and the part that contacts the workpiece
+   *  (finger tips / suction cup) alike. */
+  setColor(hex: number): void
   dispose(): void
 }
 
 const steel = () =>
   new THREE.MeshStandardMaterial({ color: 0x2b3136, metalness: 0.7, roughness: 0.35 })
+
+// Rim outline: matches the teal used for joint markers elsewhere in the scene.
+const OUTLINE_COLOR = 0x46d6c0
+const OUTLINE_SCALE = 1.15
+
+/** "Inverted hull" outline: an enlarged, back-face-only clone parented to
+ *  `mesh` so it inherits its transform (including the gripper's open/close
+ *  animation) and only shows where it pokes out past the real silhouette. */
+function addOutline(mesh: THREE.Mesh, material: THREE.Material): void {
+  const outline = new THREE.Mesh(mesh.geometry, material)
+  outline.scale.setScalar(OUTLINE_SCALE)
+  mesh.add(outline)
+}
 
 /** A cylinder whose axis is local +Z (three.js cylinders are +Y by default),
  *  spanning [z0, z1]. */
@@ -54,12 +70,14 @@ function buildSuction(): ToolMesh {
   const group = new THREE.Group()
   const body = steel()
   const rubber = new THREE.MeshStandardMaterial({ color: 0x17191b, metalness: 0.1, roughness: 0.85 })
+  const outline = new THREE.MeshBasicMaterial({ color: OUTLINE_COLOR, side: THREE.BackSide })
 
   const adapter = zCylinder(0.026, 0.026, MOUNT_Z, MOUNT_Z + 0.016, body)
   const stem = zCylinder(0.011, 0.011, MOUNT_Z + 0.016, tipZ - 0.032, body)
   const cup = zCylinder(0.032, 0.012, tipZ - 0.032, tipZ, rubber)
 
   const meshes = [adapter, stem, cup]
+  meshes.forEach((m) => addOutline(m, outline))
   const tip = tipAt(tipZ)
   group.add(...meshes, tip)
 
@@ -67,10 +85,15 @@ function buildSuction(): ToolMesh {
     group,
     tip,
     setOpen() {},
+    setColor(hex) {
+      body.color.set(hex)
+      rubber.color.set(hex)
+    },
     dispose() {
       meshes.forEach((m) => m.geometry.dispose())
       body.dispose()
       rubber.dispose()
+      outline.dispose()
     },
   }
 }
@@ -84,6 +107,7 @@ function buildGripper(): ToolMesh {
     metalness: 0.8,
     roughness: 0.3,
   })
+  const outline = new THREE.MeshBasicMaterial({ color: OUTLINE_COLOR, side: THREE.BackSide })
 
   const base = zBox(0.074, 0.074, MOUNT_Z, MOUNT_Z + 0.048, body)
   const knuckle = zBox(0.062, 0.044, MOUNT_Z + 0.048, MOUNT_Z + 0.07, body)
@@ -95,6 +119,7 @@ function buildGripper(): ToolMesh {
   left.position.z = right.position.z = (fingerZ0 + tipZ) / 2
 
   const meshes = [base, knuckle, left, right]
+  meshes.forEach((m) => addOutline(m, outline))
   const tip = tipAt(tipZ)
   group.add(...meshes, tip)
 
@@ -109,19 +134,25 @@ function buildGripper(): ToolMesh {
     group,
     tip,
     setOpen,
+    setColor(hex) {
+      body.color.set(hex)
+      fingerMat.color.set(hex)
+    },
     dispose() {
       base.geometry.dispose()
       knuckle.geometry.dispose()
       fingerGeo.dispose()
       body.dispose()
       fingerMat.dispose()
+      outline.dispose()
     },
   }
 }
 
 /** Procedural end-effector geometry, built in the flange (link6) local frame. */
-export function buildTool(tool: Exclude<ToolId, 'none'>): ToolMesh {
+export function buildTool(tool: Exclude<ToolId, 'none'>, color?: number): ToolMesh {
   const t = tool === 'suction' ? buildSuction() : buildGripper()
+  if (color !== undefined) t.setColor(color)
   t.group.traverse((o) => {
     const m = o as THREE.Mesh
     if (m.isMesh) {

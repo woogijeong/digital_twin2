@@ -55,6 +55,14 @@ class ToolRequest(BaseModel):
     tool: ToolId
 
 
+class GripperRequest(BaseModel):
+    open: bool
+
+
+class SuctionRequest(BaseModel):
+    on: bool
+
+
 class StateResponse(BaseModel):
     q: list[float]
     p: list[float]
@@ -64,3 +72,5 @@ class TelemetryFrame(BaseModel):
     q: list[float]
     p: list[float]
     ts: float
+    manipulability: float = Field(description="Yoshikawa index |det(J)| -- ~0 near a singularity")
+    error: str | None = Field(default=None, description="active controller fault, if any")

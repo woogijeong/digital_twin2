@@ -1,14 +1,18 @@
-// Runs the Playwright demo recording, then converts the .webm to docs/demo.gif
-// with ffmpeg (two-pass palette for quality). Usage: `pnpm demo:gif`
+// Runs a Playwright demo recording, then converts the .webm to a docs/*.gif
+// with ffmpeg (two-pass palette for quality).
+// Usage: `pnpm demo:gif` / `pnpm demo:pickplace:gif`
+// (or directly: `node scripts/make-demo-gif.mjs <spec.ts> <output.gif>`)
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+const [specFile = 'demo.spec.ts', outFile = 'demo.gif'] = process.argv.slice(2)
+
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const fe = join(root, 'frontend')
 const artifacts = join(fe, 'demo-artifacts')
-const out = join(root, 'docs', 'demo.gif')
+const out = join(root, 'docs', outFile)
 
 const run = (cmd, args, cwd) =>
   execFileSync(cmd, args, { cwd, stdio: 'inherit', shell: process.platform === 'win32' })
@@ -27,7 +31,7 @@ function findWebm(dir) {
 }
 
 rmSync(artifacts, { recursive: true, force: true })
-run('pnpm', ['exec', 'playwright', 'test', '--config=playwright.demo.config.ts'], fe)
+run('pnpm', ['exec', 'playwright', 'test', `e2e/${specFile}`, '--config=playwright.demo.config.ts'], fe)
 
 const webm = findWebm(artifacts)
 if (!webm) throw new Error('no .webm recorded under ' + artifacts)

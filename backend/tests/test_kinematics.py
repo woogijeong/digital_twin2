@@ -7,7 +7,7 @@ import math
 import pytest
 
 from app.robot.base import IkFailed
-from app.robot.kinematics import JOINT_LIMITS_DEG, fk, ik
+from app.robot.kinematics import JOINT_LIMITS_DEG, fk, ik, manipulability
 
 # Joint configurations across the workspace. Their FK poses are reachable by
 # construction, so IK must drive back to the same TCP pose (possibly via a
@@ -82,3 +82,16 @@ def test_ik_rejects_target_out_of_reach():
 def test_ik_rejects_target_inside_the_base():
     with pytest.raises(IkFailed):
         ik([0.0, 0.0, 40.0, 0.0, 0.0, 0.0], _NEUTRAL_SEED)
+
+
+def test_ik_rejects_target_below_the_floor():
+    with pytest.raises(IkFailed):
+        ik([350.0, -186.5, -15.0, 180.0, 0.0, 180.0], _NEUTRAL_SEED)
+
+
+def test_manipulability_drops_near_a_singularity():
+    bent = manipulability([0.0, 0.0, -90.0, 0.0, -90.0, 0.0])
+    fully_extended = manipulability([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    wrist_singular = manipulability([0.0, 0.0, -90.0, 0.0, 0.0, 0.0])
+    assert fully_extended < 1e-6 < bent
+    assert wrist_singular < bent
