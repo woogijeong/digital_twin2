@@ -114,6 +114,7 @@ pnpm dev              # -> http://localhost:5173 접속
 6. **컨트롤러 연결 모드**
    - 목업(오프라인) 모드 강제: `INDY_USE_MOCK=1 pnpm dev`
    - 다른 컨트롤러/시뮬레이터 IP 사용: `INDY_HOST=10.0.0.5 pnpm dev`
+
 7. **(선택) 테스트**
 ```bash
    pnpm test:api                                  # 백엔드 pytest
