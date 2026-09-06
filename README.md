@@ -72,6 +72,53 @@ pnpm dev              # -> http://localhost:5173 접속
 - 실제 로봇 컨트롤러(192.168.3.4)가 네트워크에 없으면 자동으로 mock 모드로 전환되며, 헤더에 `MOCK` 배지가 표시됩니다. 화면 상단의 CONNECT 버튼으로 언제든 실제 컨트롤러 IP를 입력해 연결을 시도할 수 있습니다.
 - 테스트 전체 실행: `pnpm test` (백엔드 pytest + 프론트엔드 빌드 + Playwright e2e)
 
+## 로컬 실행 가이드 (한국어)
+
+### 요구사항
+- Node.js ≥ 22, pnpm (`npm i -g pnpm`)
+- [uv](https://docs.astral.sh/uv/) — Python 3.12 백엔드 환경을 자동으로 관리 (neuromeka SDK의 gRPC 의존성이 3.13+ 휠을 제공하지 않아 3.12 고정 필요)
+- 컨트롤러(기본 `192.168.3.4`)가 연결되어 있지 않아도 `MockRobot`으로 자동 폴백되므로 실행 자체는 가능
+
+### 실행 순서
+1. **저장소 클론**
+```bash
+   git clone https://github.com/woogijeong/digital_twin2.git
+   cd digital_twin2
+```
+2. **루트 및 프론트엔드 의존성 설치**
+```bash
+   pnpm install
+   pnpm --dir frontend install
+```
+3. **백엔드 Python 환경 구성**
+```bash
+   uv sync --project backend
+```
+   > 시스템 기본 Python이 3.14 등으로 잡혀 있어 `pyyaml` 빌드 에러가 나는 경우:
+   > ```bash
+   > cd backend
+   > uv python pin 3.12
+   > cd ..
+   > uv sync --project backend
+   > ```
+4. **(선택) URDF 에셋 갱신** — 기본 에셋이 이미 커밋되어 있어 보통 생략 가능
+```bash
+   pnpm assets
+```
+5. **개발 서버 실행**
+```bash
+   pnpm dev   # 백엔드 :8000 + 프론트엔드 :5173
+```
+   브라우저에서 `http://localhost:5173` 접속.
+6. **컨트롤러 연결 모드**
+   - 목업(오프라인) 모드 강제: `INDY_USE_MOCK=1 pnpm dev`
+   - 다른 컨트롤러/시뮬레이터 IP 사용: `INDY_HOST=10.0.0.5 pnpm dev`
+7. **(선택) 테스트**
+```bash
+   pnpm test:api                                  # 백엔드 pytest
+   pnpm --dir frontend exec playwright install chromium  # 최초 1회
+   pnpm test:e2e                                  # Playwright e2e
+```
 ## Architecture
 
 ```
