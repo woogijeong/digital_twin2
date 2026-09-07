@@ -8,6 +8,9 @@ interface Props {
   link: LinkState
   /** backend has lost the controller link and is reconnecting (from telemetry) */
   linkLost?: boolean
+  /** controller's own simulation-mode flag from telemetry; false = a live
+   *  controller. null/undefined until the first frame (assume simulation). */
+  simulation?: boolean | null
   /** Called with the fresh health after a connect / disconnect. */
   onHealthChange: (h: Health) => void
   theme: 'dark' | 'light'
@@ -20,6 +23,7 @@ export default function StatusBar({
   health,
   link,
   linkLost,
+  simulation,
   onHealthChange,
   theme,
   onToggleTheme,
@@ -27,6 +31,9 @@ export default function StatusBar({
   onToggleViewportTheme,
 }: Props) {
   const mock = health?.mode === 'mock'
+  // A real controller reports its own mode; the twin never sets it. Until the
+  // first frame arrives, assume simulation (the conservative label).
+  const modeLabel = mock ? 'MOCK' : simulation === false ? 'LIVE' : 'SIMULATION'
   const [hostEdit, setHostEdit] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -59,7 +66,7 @@ export default function StatusBar({
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 12 }}>
         <span style={{ ...badge, borderColor: mock ? T.badgeBorderMock : T.badgeBorderSim }}>
-          {mock ? 'MOCK' : 'SIMULATION'}
+          {modeLabel}
         </span>
 
         {mock ? (

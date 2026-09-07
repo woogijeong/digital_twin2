@@ -95,6 +95,7 @@ export default function App() {
         health={health}
         link={link}
         linkLost={linkLost}
+        simulation={frame?.simulation}
         onHealthChange={setHealth}
         theme={theme}
         onToggleTheme={toggleTheme}

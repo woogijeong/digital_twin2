@@ -22,7 +22,7 @@ async def create_robot() -> RobotService:
     real = IndyDCP3Robot(settings.host)
     try:
         await real.connect()
-        log.info("connected to controller %s (simulation mode)", settings.host)
+        log.info("connected to controller %s (mode left unchanged)", settings.host)
         return real
     except RobotUnavailable as exc:
         log.warning("controller unavailable (%s) - falling back to mock mode", exc)

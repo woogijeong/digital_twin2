@@ -1,9 +1,11 @@
 """IndyDCP3-backed robot service.
 
 Wraps the synchronous ``neuromeka`` gRPC client. Every SDK call is pushed to a
-worker thread so the event loop is never blocked. The controller is put into
-**simulation mode** on connect -- P0 mirrors and solves kinematics but never
-commands real motion.
+worker thread so the event loop is never blocked. Connecting never changes the
+controller's state (it does not touch ``set_simulation_mode``): P0 mirrors and
+solves kinematics but never commands real motion, enforced by the ``_call``
+allow-list. Whatever mode the controller is actually in is reported back in the
+telemetry frame (``simulation``) and shown in the header.
 """
 
 from __future__ import annotations
@@ -34,6 +36,8 @@ log = logging.getLogger("indy_twin.robot")
 # end-effector I/O (the gripper/suction solenoids) -- it actuates the *tool*,
 # not the arm, so it's not motion either. ``get_do`` is a read of those same
 # digital outputs -- so the twin can mirror the live gripper / suction state.
+# ``set_simulation_mode`` is deliberately absent: connecting must not change
+# the controller's operating mode -- the twin observes whatever mode it finds.
 _ALLOWED_SDK_CALLS = frozenset(
     {
         "get_control_data",
@@ -41,7 +45,6 @@ _ALLOWED_SDK_CALLS = frozenset(
         "get_do",
         "inverse_kin",
         "forward_kin",
-        "set_simulation_mode",
         "set_tool_frame",
         "recover",
         "set_do",
@@ -110,8 +113,9 @@ class IndyDCP3Robot(RobotService):
         from neuromeka import IndyDCP3
 
         indy = IndyDCP3(self._host)
-        # Safety gate: never let P0 drive the physical robot.
-        indy.set_simulation_mode(True)
+        # Connecting must not change the controller's state -- P0 only reads and
+        # solves kinematics (motion is blocked by the ``_call`` allow-list), so
+        # the controller's simulation mode is left exactly as we find it.
         # Touch the control channel so a dead host fails here, not later.
         indy.get_control_data()
         return indy
@@ -162,6 +166,8 @@ class IndyDCP3Robot(RobotService):
     async def set_tool(self, tool: str) -> None:
         if tool not in TOOL_EXTRA_MM:
             raise ValueError(f"unknown tool {tool!r}")
+        if tool == self.tool:
+            return  # no change -> don't write the tool frame to the controller
         # Configures the controller's TCP reference; not a motion command.
         await self._call("set_tool_frame", tool_frame_fpos(tool))
         self.tool = tool
@@ -255,5 +261,6 @@ class IndyDCP3Robot(RobotService):
                 robot_connected=bool(data.get("is_robot_connected", True)),
                 gripper_open=gripper_open,
                 suction_on=suction_on,
+                simulation=bool(data["sim_mode"]) if "sim_mode" in data else None,
             )
             await asyncio.sleep(period)

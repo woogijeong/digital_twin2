@@ -14,6 +14,9 @@ export interface TelemetryFrame {
   gripper_open?: boolean | null
   /** live suction state from the controller (DO2); null when unknown / mock */
   suction_on?: boolean | null
+  /** controller's own simulation-mode flag (the twin never changes it);
+   *  null in mock mode or while the link is down */
+  simulation?: boolean | null
 }
 
 export type LinkState = 'connecting' | 'linked' | 'reconnecting'

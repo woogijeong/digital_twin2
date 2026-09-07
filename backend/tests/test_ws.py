@@ -19,6 +19,7 @@ def test_frame_shape(client):
         "robot_connected",
         "gripper_open",
         "suction_on",
+        "simulation",
     }
     assert len(frame["q"]) == 6 and len(frame["p"]) == 6
     assert frame["link_ok"] is True and frame["robot_connected"] is True

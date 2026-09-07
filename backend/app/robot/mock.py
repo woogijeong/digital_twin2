@@ -122,5 +122,6 @@ class MockRobot(RobotService):
                 robot_connected=True,
                 gripper_open=None,  # mock's gripper is client-side visual only
                 suction_on=None,
+                simulation=None,  # not a real controller; UI shows the MOCK badge
             )
             await asyncio.sleep(period)

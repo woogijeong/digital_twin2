@@ -97,3 +97,9 @@ class TelemetryFrame(BaseModel):
         description="live suction state from the controller's digital output DO2 "
         "(real mode); null when unknown or not wired, or in mock mode",
     )
+    simulation: bool | None = Field(
+        default=None,
+        description="controller's own simulation-mode flag as reported by the "
+        "controller (the twin never changes it); null in mock mode or while the "
+        "link is down",
+    )

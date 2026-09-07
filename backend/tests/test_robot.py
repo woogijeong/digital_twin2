@@ -35,7 +35,11 @@ async def test_mock_stream_reports_manipulability_and_no_error():
 
 
 def _fake_indy(
-    op_state: int = 5, robot_connected: bool = True, do0: int = 0, do2: int = 2
+    op_state: int = 5,
+    robot_connected: bool = True,
+    do0: int = 0,
+    do2: int = 2,
+    sim_mode: bool = True,
 ) -> MagicMock:
     indy = MagicMock()
     indy.get_control_data.return_value = {
@@ -43,6 +47,7 @@ def _fake_indy(
         "p": [2.0] * 6,
         "op_state": op_state,
         "is_robot_connected": robot_connected,
+        "sim_mode": sim_mode,
     }
     indy.get_control_state.return_value = {"manipulability": 0.3}
     indy.get_do.return_value = {
@@ -71,6 +76,27 @@ async def test_indy_stream_reports_closed_gripper():
     assert frame.gripper_open is False
     assert frame.suction_on is True
     await gen.aclose()
+
+
+async def test_indy_stream_reports_controller_simulation_flag_without_changing_it():
+    robot = IndyDCP3Robot("10.0.0.9")
+    robot._indy = _fake_indy(sim_mode=False)  # controller is live, not simulating
+    robot._connected = True
+    gen = robot.stream()
+    frame = await anext(gen)
+    assert frame.simulation is False
+    robot._indy.set_simulation_mode.assert_not_called()
+    await gen.aclose()
+
+
+async def test_indy_set_tool_skips_the_controller_write_when_unchanged():
+    robot = IndyDCP3Robot("10.0.0.9")
+    robot._indy = _fake_indy()
+    robot._connected = True
+    await robot.set_tool("none")  # already "none" -> no SDK write
+    robot._indy.set_tool_frame.assert_not_called()
+    await robot.set_tool("gripper")  # real change -> writes
+    robot._indy.set_tool_frame.assert_called_once()
 
 
 async def test_indy_stream_maps_estop_op_state_to_a_readable_fault():
@@ -144,7 +170,9 @@ async def test_mock_ik_rejects_unreachable():
         await robot.solve_ik([9999, 0, 0, 0, 0, 0], [0] * 6)
 
 
-async def test_indy_connect_forces_simulation_mode(monkeypatch):
+async def test_indy_connect_does_not_change_the_controller_mode(monkeypatch):
+    """Connecting must never touch set_simulation_mode -- the twin observes
+    whatever mode the controller is already in."""
     fake = MagicMock()
     fake_module = MagicMock()
     fake_module.IndyDCP3.return_value = fake
@@ -153,7 +181,7 @@ async def test_indy_connect_forces_simulation_mode(monkeypatch):
     robot = IndyDCP3Robot("10.0.0.9")
     await robot.connect()
 
-    fake.set_simulation_mode.assert_called_once_with(True)
+    fake.set_simulation_mode.assert_not_called()
     assert robot.connected
 
 
@@ -187,7 +215,9 @@ async def test_call_rejects_non_allowlisted_sdk_method():
     """The runtime chokepoint refuses anything but read + kinematics."""
     robot = IndyDCP3Robot("10.0.0.9")
     robot._indy = MagicMock()  # pretend connected
-    for name in ("movej", "movel", "start_teleop"):
+    # motion is blocked, and so is set_simulation_mode -- connecting or running
+    # the twin must never change the controller's operating mode
+    for name in ("movej", "movel", "start_teleop", "set_simulation_mode"):
         with pytest.raises(RuntimeError, match="not permitted in P0"):
             await robot._call(name, [0] * 6)
     # allow-listed calls still dispatch (read, kinematics, TCP tool frame)
