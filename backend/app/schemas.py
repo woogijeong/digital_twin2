@@ -73,4 +73,27 @@ class TelemetryFrame(BaseModel):
     p: list[float]
     ts: float
     manipulability: float = Field(description="Yoshikawa index |det(J)| -- ~0 near a singularity")
-    error: str | None = Field(default=None, description="active controller fault, if any")
+    error: str | None = Field(
+        default=None,
+        description="active controller fault or link problem the operator should see, if any",
+    )
+    link_ok: bool = Field(
+        default=True,
+        description="telemetry is live from its source (real controller reachable); "
+        "false while the twin has lost the controller and is reconnecting",
+    )
+    robot_connected: bool = Field(
+        default=True,
+        description="controller reports the physical arm attached (real mode only; "
+        "always true for the mock)",
+    )
+    gripper_open: bool | None = Field(
+        default=None,
+        description="live gripper state from the controller's digital output DO0 "
+        "(real mode); null when unknown or not wired, or in mock mode",
+    )
+    suction_on: bool | None = Field(
+        default=None,
+        description="live suction state from the controller's digital output DO2 "
+        "(real mode); null when unknown or not wired, or in mock mode",
+    )

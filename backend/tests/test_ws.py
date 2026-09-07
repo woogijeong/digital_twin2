@@ -9,8 +9,19 @@ import time
 def test_frame_shape(client):
     with client.websocket_connect("/ws/telemetry") as ws:
         frame = json.loads(ws.receive_text())
-    assert set(frame) == {"q", "p", "ts", "manipulability", "error"}
+    assert set(frame) == {
+        "q",
+        "p",
+        "ts",
+        "manipulability",
+        "error",
+        "link_ok",
+        "robot_connected",
+        "gripper_open",
+        "suction_on",
+    }
     assert len(frame["q"]) == 6 and len(frame["p"]) == 6
+    assert frame["link_ok"] is True and frame["robot_connected"] is True
 
 
 def test_rate_is_about_20hz(client):

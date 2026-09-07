@@ -118,5 +118,9 @@ class MockRobot(RobotService):
                 ts=time.time(),
                 manipulability=kinematics.manipulability(q, self._tcp()),
                 error=None,
+                link_ok=True,
+                robot_connected=True,
+                gripper_open=None,  # mock's gripper is client-side visual only
+                suction_on=None,
             )
             await asyncio.sleep(period)

@@ -6,6 +6,14 @@ export interface TelemetryFrame {
   ts: number
   manipulability: number
   error: string | null
+  /** false while the backend has lost the controller and is reconnecting */
+  link_ok?: boolean
+  /** false when the controller reports the physical arm is not attached */
+  robot_connected?: boolean
+  /** live gripper state from the controller (DO0); null when unknown / mock */
+  gripper_open?: boolean | null
+  /** live suction state from the controller (DO2); null when unknown / mock */
+  suction_on?: boolean | null
 }
 
 export type LinkState = 'connecting' | 'linked' | 'reconnecting'

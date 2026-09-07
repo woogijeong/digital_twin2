@@ -65,16 +65,29 @@ async def health(request: Request) -> HealthResponse:
     return _health(request)
 
 
+def _unavailable(exc: Exception) -> HTTPException:
+    return HTTPException(
+        status_code=503,
+        detail={"error": "controller_unavailable", "detail": str(exc)},
+    )
+
+
 @router.get("/pose", response_model=PoseDTO)
 async def pose(request: Request) -> PoseDTO:
-    return await _robot(request).get_pose()
+    try:
+        return await _robot(request).get_pose()
+    except Exception as exc:  # noqa: BLE001 - controller/channel down; report it, don't 500
+        raise _unavailable(exc) from exc
 
 
 @router.get("/state", response_model=StateResponse)
 async def state(request: Request) -> StateResponse:
     robot = _robot(request)
-    q = await robot.get_joints()
-    p = (await robot.get_pose()).as_list()
+    try:
+        q = await robot.get_joints()
+        p = (await robot.get_pose()).as_list()
+    except Exception as exc:  # noqa: BLE001 - controller/channel down; report it, don't 500
+        raise _unavailable(exc) from exc
     return StateResponse(q=q, p=p)
 
 

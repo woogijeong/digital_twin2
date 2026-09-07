@@ -6,6 +6,8 @@ import type { LinkState } from '../hooks/useTelemetry'
 interface Props {
   health: Health | null
   link: LinkState
+  /** backend has lost the controller link and is reconnecting (from telemetry) */
+  linkLost?: boolean
   /** Called with the fresh health after a connect / disconnect. */
   onHealthChange: (h: Health) => void
   theme: 'dark' | 'light'
@@ -17,6 +19,7 @@ interface Props {
 export default function StatusBar({
   health,
   link,
+  linkLost,
   onHealthChange,
   theme,
   onToggleTheme,
@@ -96,7 +99,11 @@ export default function StatusBar({
           {viewportTheme === 'black' ? '⬜ GRAY BG' : '⬛ BLACK BG'}
         </button>
 
-        <LinkBadge link={link} real={health?.mode === 'real' && health.connected} />
+        <LinkBadge
+          link={link}
+          real={health?.mode === 'real' && health.connected}
+          linkLost={!!linkLost}
+        />
       </div>
     </header>
   )
@@ -104,14 +111,19 @@ export default function StatusBar({
 
 /** "LINKED" means connected to the real controller -- a mock session never
  *  claims to be linked, even while its (own, offline) telemetry is flowing. */
-function LinkBadge({ link, real }: { link: LinkState; real: boolean }) {
-  const map = {
-    connecting: { text: 'CONNECTING', color: T.muted, blink: false },
-    linked: real
-      ? { text: 'LINKED', color: T.green, blink: false }
-      : { text: 'NOT LINKED', color: T.muted, blink: false },
-    reconnecting: { text: 'RECONNECTING', color: T.amber, blink: true },
-  }[link]
+function LinkBadge({ link, real, linkLost }: { link: LinkState; real: boolean; linkLost: boolean }) {
+  // A lost controller link wins over the socket-level state: the browser
+  // WebSocket is still up (link-lost frames keep arriving), so `link` reads
+  // "linked" even though the twin can't reach the controller.
+  const map = linkLost
+    ? { text: 'LINK LOST', color: T.amber, blink: true }
+    : {
+        connecting: { text: 'CONNECTING', color: T.muted, blink: false },
+        linked: real
+          ? { text: 'LINKED', color: T.green, blink: false }
+          : { text: 'NOT LINKED', color: T.muted, blink: false },
+        reconnecting: { text: 'RECONNECTING', color: T.amber, blink: true },
+      }[link]
 
   return (
     <span

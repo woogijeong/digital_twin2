@@ -22,8 +22,11 @@ import { checkSafety, nearLimitJoints } from './safety'
 
 export default function App() {
   const [health, setHealth] = useState<Health | null>(null)
-  const [gripperOpen, setGripperOpen] = useState(true)
-  const [suctionOn, setSuctionOn] = useState(false)
+  // Local (optimistic) end-effector state. When linked to a real controller the
+  // live digital-output readback in the telemetry frame is authoritative and
+  // overrides these; in mock mode these are the source of truth.
+  const [gripperOpenLocal, setGripperOpenLocal] = useState(true)
+  const [suctionOnLocal, setSuctionOnLocal] = useState(false)
   const [toolBusy, setToolBusy] = useState(false)
   const [gripperColor, setGripperColor] = useState('#2b3136')
   const [suctionColor, setSuctionColor] = useState('#2b3136')
@@ -32,9 +35,21 @@ export default function App() {
   const { frame, link, stale } = useTelemetry()
   const { jointsDeg, animateTo } = useJointAnimation(frame?.q ?? null)
 
+  const linkLost = frame?.link_ok === false
+  // A sim-mode controller with no physical arm attached reports this as its
+  // normal state, so it is a quiet footer note, not an alarm banner.
+  const armOffline = health?.mode === 'real' && frame?.robot_connected === false
+
+  // Mirror the real controller's live gripper / suction state when it reports
+  // one (DO readback); fall back to the local optimistic state otherwise.
+  const gripperOpen = frame?.gripper_open ?? gripperOpenLocal
+  const suctionOn = frame?.suction_on ?? suctionOnLocal
+
+  // Refetch health whenever the link state changes so the header badge and
+  // `connected` flag track a controller that dropped or came back mid-session.
   useEffect(() => {
     getHealth().then(setHealth).catch(() => setHealth(null))
-  }, [])
+  }, [link, linkLost])
 
   const pose = frame?.p ?? null
   const tool: ToolId = health?.tool ?? 'none'
@@ -53,14 +68,14 @@ export default function App() {
   }
 
   const toggleGripper = (open: boolean) => {
-    setGripperOpen(open)
+    setGripperOpenLocal(open)
     setGripperDo(open).catch(() => {
       /* mock ignores it; a real controller failure shouldn't revert the twin's visual state */
     })
   }
 
   const toggleSuction = (on: boolean) => {
-    setSuctionOn(on)
+    setSuctionOnLocal(on)
     setSuctionDo(on).catch(() => {
       /* same as above */
     })
@@ -79,6 +94,7 @@ export default function App() {
       <StatusBar
         health={health}
         link={link}
+        linkLost={linkLost}
         onHealthChange={setHealth}
         theme={theme}
         onToggleTheme={toggleTheme}
@@ -113,7 +129,13 @@ export default function App() {
             suctionColor={suctionColor}
             viewportTheme={viewportTheme}
           />
-          <ViewportOverlays pose={pose} stale={stale} alerts={safetyAlerts} />
+          <ViewportOverlays
+            pose={pose}
+            stale={stale}
+            alerts={safetyAlerts}
+            linkLost={linkLost}
+            fault={frame?.error ?? null}
+          />
         </div>
 
         <aside
@@ -136,6 +158,7 @@ export default function App() {
             mode={health?.mode ?? null}
             onApply={(jpos) => animateTo(jpos)}
             error={frame?.error ?? null}
+            linkLost={linkLost}
           />
           <ToolPanel
             tool={tool}
@@ -163,7 +186,7 @@ export default function App() {
               borderTop: `1px solid ${T.border}`,
             }}
           >
-            <span>mode {health?.mode ?? '—'}</span>
+            <span>mode {health?.mode ?? '—'}{armOffline ? ' · arm offline' : ''}</span>
             <span>{frame ? `manipulability ${frame.manipulability.toFixed(3)}` : '—'}</span>
             <span>{frame ? `ts ${frame.ts.toFixed(0)}` : 'no telemetry'}</span>
           </div>

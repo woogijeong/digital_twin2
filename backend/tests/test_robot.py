@@ -34,6 +34,101 @@ async def test_mock_stream_reports_manipulability_and_no_error():
     await gen.aclose()
 
 
+def _fake_indy(
+    op_state: int = 5, robot_connected: bool = True, do0: int = 0, do2: int = 2
+) -> MagicMock:
+    indy = MagicMock()
+    indy.get_control_data.return_value = {
+        "q": [1.0] * 6,
+        "p": [2.0] * 6,
+        "op_state": op_state,
+        "is_robot_connected": robot_connected,
+    }
+    indy.get_control_state.return_value = {"manipulability": 0.3}
+    indy.get_do.return_value = {
+        "signals": [{"address": 0, "state": do0}, {"address": 2, "state": do2}]
+    }
+    return indy
+
+
+async def test_indy_stream_mirrors_live_gripper_and_suction_from_digital_outputs():
+    robot = IndyDCP3Robot("10.0.0.9")
+    robot._indy = _fake_indy(do0=1, do2=2)  # DO0 ON (gripper open), DO2 unused
+    robot._connected = True
+    gen = robot.stream()
+    frame = await anext(gen)
+    assert frame.gripper_open is True
+    assert frame.suction_on is None  # DO2 not configured -> unknown
+    await gen.aclose()
+
+
+async def test_indy_stream_reports_closed_gripper():
+    robot = IndyDCP3Robot("10.0.0.9")
+    robot._indy = _fake_indy(do0=0, do2=1)  # DO0 OFF (closed), DO2 ON (suction)
+    robot._connected = True
+    gen = robot.stream()
+    frame = await anext(gen)
+    assert frame.gripper_open is False
+    assert frame.suction_on is True
+    await gen.aclose()
+
+
+async def test_indy_stream_maps_estop_op_state_to_a_readable_fault():
+    robot = IndyDCP3Robot("10.0.0.9")
+    robot._indy = _fake_indy(op_state=9)  # OpState.STOP_AND_OFF
+    robot._connected = True
+    gen = robot.stream()
+    frame = await anext(gen)
+    assert frame.error is not None and "EMERGENCY STOP" in frame.error
+    assert frame.link_ok is True
+    await gen.aclose()
+
+
+async def test_indy_stream_reports_detached_arm():
+    robot = IndyDCP3Robot("10.0.0.9")
+    robot._indy = _fake_indy(op_state=5, robot_connected=False)
+    robot._connected = True
+    gen = robot.stream()
+    frame = await anext(gen)
+    assert frame.error is None  # op_state 5 (IDLE) is not itself a fault
+    assert frame.robot_connected is False
+    await gen.aclose()
+
+
+async def test_indy_stream_surfaces_a_dropped_link_then_recovers(monkeypatch):
+    robot = IndyDCP3Robot("10.0.0.9")
+    indy = _fake_indy()
+    robot._indy = indy
+    robot._connected = True
+
+    async def _no_redial() -> None:
+        return None
+
+    monkeypatch.setattr(robot, "_redial", _no_redial)
+
+    calls = {"n": 0}
+    ok = indy.get_control_data.return_value
+
+    def flaky():
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("gRPC channel down")
+        return ok
+
+    indy.get_control_data.side_effect = flaky
+
+    gen = robot.stream()
+    lost = await anext(gen)
+    assert lost.link_ok is False
+    assert lost.error is not None and "LINK LOST" in lost.error
+    assert robot.connected is False
+
+    restored = await anext(gen)
+    assert restored.link_ok is True
+    assert robot.connected is True
+    await gen.aclose()
+
+
 async def test_mock_gripper_and_suction_are_harmless_no_ops():
     robot = MockRobot()
     await robot.set_gripper(True)
