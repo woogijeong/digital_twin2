@@ -56,6 +56,8 @@ P0 MVP 이후 추가된 기능들입니다 (한국어로 정리):
 - **컨트롤러 링크 끊김 / fault 가시화** — 실기 gRPC 연결이 끊기면 화면이 마지막 프레임에 멈추지 않고 상단·헤더·패널에 "CONTROLLER LINK LOST" 경고를 표시하며 2초 간격으로 자동 재연결합니다. `op_state` fault도 VIOLATE/COLLISION 외에 E-stop·전원 off·수동복구 등을 사람이 읽을 수 있는 메시지로 표시합니다. 물리 로봇 팔 미연결(`is_robot_connected: false`)은 이 컨트롤러 셋업의 정상 상태라 경고가 아니라 하단 상태줄에 "arm offline"으로만 조용히 표시합니다.
 - **ALL DO OFF 버튼** — END EFFECTOR 패널 하단의 버튼 하나로 트윈이 다루는 모든 엔드 이펙터 디지털 출력(DO0·DO1 그리퍼 솔레노이드, DO2 석션 밸브)을 한 번에 LOW로 내립니다. 화면의 그리퍼/석션 표시도 함께 초기화됩니다.
 - **비상정지(E-STOP) 버튼** — 헤더의 빨간 `■ E-STOP` 버튼이 `stop_motion`(category-1, 제어 감속 후 브레이크)으로 컨트롤러 모션을 즉시 정지시킵니다. 동시에 진행 중인 IK 애니메이션을 취소해 화면상 팔도 버튼 누르는 즉시 멈춥니다. 이것은 트윈이 컨트롤러를 명령하는 **유일한 예외**입니다 — 모션을 *멈추기만* 하며 절대 시작시키지 않고, 실물 로봇을 지켜보는 작업자에게 필요한 안전 장치이기 때문입니다. 정지 후 컨트롤러가 보고하는 STOP 상태는 기존 fault 배너 + `RECOVER` 버튼으로 처리됩니다.
+- **모션 시퀀스 재생 (mock 전용)** — 실기에 연결되지 않은 mock 모드에서, 사이드바의 `MOTION SEQUENCE` 패널에 JSON 스텝 배열을 붙여넣고 3D 트윈이 스텝을 따라 움직이는 걸 재생할 수 있습니다. `PLAY / PAUSE / STEP / RESET` + 배속(0.5×~4×), 현재 스텝 하이라이트. 스텝 종류: `movej`, `movel`(abs/rel/tool 프레임), `gripper`, `suction`, `wait`, `home`, `tool`. PLAY를 누르면 먼저 컴파일하며 모든 이동을 IK로 미리 풀어, 도달 불가·바닥 침범 같은 문제를 `step N: …`로 재생 전에 알려줍니다. 모션 엔드포인트는 호출하지 않고 `/api/ik`(컴파일)과 `/api/home`(RESET)만 사용하며, 실기 연결 시 PLAY는 비활성화됩니다 (RESET TO HOME이 real 모드에서 잠기는 것과 동일).
+- **참조 팔레트 모델 + on/off** — `pallet_corners.json`으로 실측한 팔레트(base 기준 190mm 정사각, 상단 z=184.5mm)를 3D 뷰포트에 배치합니다. GLB 모델을 자동 스케일해 측정 위치에 놓고, 상판 4모서리(픽 지점)에 청록 핀을 표시하며, 바닥까지 받침 블록을 채웁니다. 헤더의 `▨ PALLET` 버튼으로 표시/숨김을 토글하며 브라우저에 저장됩니다. 씬 장식이라 mock·real 양쪽에서 보이고, 모델 로드에 실패해도 로봇 렌더링은 막지 않습니다.
 
 ## 실행 방법 (한국어)
 
@@ -166,6 +168,15 @@ pnpm dev              # -> http://localhost:5173 접속
   ready pose and eases to applied targets using forward/inverse kinematics
   derived from the committed Indy7 URDF, so its poses are in the same base
   (reference) frame the real controller reports and line up with the 3D model.
+- **Sequence playback (mock only).** The `MOTION SEQUENCE` panel plays a pasted
+  JSON step list back as a pure client-side simulation (PLAY / PAUSE / STEP /
+  RESET + speed). A compile pass pre-solves every move via `/api/ik` and reports
+  a bad step before anything runs; no step calls a motion endpoint. `PLAY` is
+  disabled whenever a real controller is linked.
+- **Reference pallet.** A GLB pallet model is placed at the location measured in
+  `pallet_corners.json` (base frame, top surface at z = 184.5 mm) with pins on
+  the four corner pick points; toggle it with the header's `▨ PALLET` button.
+  Purely scene dressing — a load failure never blocks the twin.
 - **Connect / disconnect from the UI.** The status bar has an editable
   controller address and a `CONNECT` / `DISCONNECT` toggle (`POST /api/connect`
   · `/api/disconnect`); the open telemetry socket is repointed at the new source

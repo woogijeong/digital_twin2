@@ -5,6 +5,7 @@ import type { ToolId } from '../api/client'
 import { SCENE, T, VIEWPORT_PRESETS, type ViewportTheme } from '../theme'
 import AxisGizmo, { type AxisProjection } from '../components/AxisGizmo'
 import { loadIndy7, type LoadedRobot } from './urdfRobot'
+import { loadPallet, type PalletHandle } from './pallet'
 import { usePayload } from '../hooks/usePayload'
 
 // URDF is Z-up; the scene is Y-up (the robot object is rotated to match). The
@@ -42,6 +43,8 @@ interface Props {
   suctionColor: string
   /** Scene background + grid preset. */
   viewportTheme: ViewportTheme
+  /** Show the reference pallet model (from `pallet_corners.json`). */
+  showPallet: boolean
 }
 
 /** three.js viewport. Owns the render loop; joint state is pushed in via props. */
@@ -52,6 +55,7 @@ export default function RobotViewer({
   gripperColor,
   suctionColor,
   viewportTheme,
+  showPallet,
 }: Props) {
   const mountRef = useRef<HTMLDivElement>(null)
   const robotRef = useRef<LoadedRobot | null>(null)
@@ -62,6 +66,8 @@ export default function RobotViewer({
   const suctionColorRef = useRef(suctionColor)
   const sceneRef = useRef<THREE.Scene | null>(null)
   const gridRef = useRef<THREE.GridHelper | null>(null)
+  const palletRef = useRef<PalletHandle | null>(null)
+  const showPalletRef = useRef(showPallet)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [gizmoAxes, setGizmoAxes] = useState<AxisProjection[] | null>(null)
@@ -106,6 +112,11 @@ export default function RobotViewer({
     gripperRef.current = gripperOpen
     robotRef.current?.setGripperOpen(gripperOpen)
   }, [gripperOpen])
+
+  useEffect(() => {
+    showPalletRef.current = showPallet
+    if (palletRef.current) palletRef.current.group.visible = showPallet
+  }, [showPallet])
 
   useEffect(() => {
     const scene = sceneRef.current
@@ -197,6 +208,20 @@ export default function RobotViewer({
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
 
+    // The reference pallet is optional scene dressing — a load failure must not
+    // block the twin, so it's fire-and-forget with its own catch.
+    loadPallet()
+      .then((pallet) => {
+        if (disposed) {
+          pallet.dispose()
+          return
+        }
+        palletRef.current = pallet
+        pallet.group.visible = showPalletRef.current
+        scene.add(pallet.group)
+      })
+      .catch((e: unknown) => console.warn('pallet model failed to load:', e))
+
     const tick = () => {
       raf = requestAnimationFrame(tick)
       const robot = robotRef.current
@@ -231,6 +256,9 @@ export default function RobotViewer({
       controls.dispose()
       robotRef.current?.dispose()
       robotRef.current = null
+      palletRef.current?.group.parent?.remove(palletRef.current.group)
+      palletRef.current?.dispose()
+      palletRef.current = null
       tcpMarker.geometry.dispose()
       ;(tcpMarker.material as THREE.Material).dispose()
       payload.parent?.remove(payload)

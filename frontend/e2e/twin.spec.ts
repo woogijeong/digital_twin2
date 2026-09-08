@@ -286,6 +286,27 @@ test('viewport background toggle switches between black and gray', async ({ page
   expect(await toggle.textContent()).toBe(before)
 })
 
+test('pallet toggle shows and hides the reference model without errors', async ({ page }) => {
+  const jsErrors: string[] = []
+  page.on('pageerror', (e) => jsErrors.push(String(e)))
+
+  await page.goto('/')
+  await expect(page.getByText('LINKED')).toBeVisible({ timeout: 10_000 })
+  await expect(page.locator('canvas')).toBeVisible()
+
+  const toggle = page.getByRole('button', { name: 'PALLET' })
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true') // shown by default
+  await page.waitForTimeout(1000) // let the GLB load
+  await page.screenshot({ path: `${SHOTS}/04-pallet.png` })
+
+  await toggle.click()
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false')
+  await toggle.click()
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true')
+
+  expect(jsErrors, jsErrors.join('\n')).toHaveLength(0)
+})
+
 test('gripper and suction each expose their own color picker', async ({ page }) => {
   await page.goto('/')
   await expect(page.getByText('LINKED')).toBeVisible({ timeout: 10_000 })

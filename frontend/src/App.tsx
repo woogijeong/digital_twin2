@@ -17,6 +17,7 @@ import { useJointAnimation } from './hooks/useJointAnimation'
 import { useSequencePlayback } from './hooks/useSequencePlayback'
 import { useTheme } from './hooks/useTheme'
 import { useViewportTheme } from './hooks/useViewportTheme'
+import { usePalletVisible } from './hooks/usePalletVisible'
 import RobotViewer from './three/RobotViewer'
 import StatusBar from './components/StatusBar'
 import PosePanel from './components/PosePanel'
@@ -38,6 +39,7 @@ export default function App() {
   const [suctionColor, setSuctionColor] = useState('#2b3136')
   const { theme, toggleTheme } = useTheme()
   const { viewportTheme, toggleViewportTheme } = useViewportTheme()
+  const { palletVisible, togglePallet } = usePalletVisible()
   const { frame, link, stale } = useTelemetry()
   const { jointsDeg, animateTo, stopAnimation, holdTelemetry } = useJointAnimation(frame?.q ?? null)
 
@@ -142,6 +144,8 @@ export default function App() {
         onToggleTheme={toggleTheme}
         viewportTheme={viewportTheme}
         onToggleViewportTheme={toggleViewportTheme}
+        palletVisible={palletVisible}
+        onTogglePallet={togglePallet}
       />
 
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
@@ -170,6 +174,7 @@ export default function App() {
             gripperColor={gripperColor}
             suctionColor={suctionColor}
             viewportTheme={viewportTheme}
+            showPallet={palletVisible}
           />
           <ViewportOverlays
             pose={pose}

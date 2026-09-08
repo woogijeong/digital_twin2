@@ -19,6 +19,8 @@ interface Props {
   onToggleTheme: () => void
   viewportTheme: ViewportTheme
   onToggleViewportTheme: () => void
+  palletVisible: boolean
+  onTogglePallet: () => void
 }
 
 export default function StatusBar({
@@ -32,6 +34,8 @@ export default function StatusBar({
   onToggleTheme,
   viewportTheme,
   onToggleViewportTheme,
+  palletVisible,
+  onTogglePallet,
 }: Props) {
   const mock = health?.mode === 'mock'
   // A real controller reports its own mode; the twin never sets it. Until the
@@ -130,6 +134,15 @@ export default function StatusBar({
           style={connBtn}
         >
           {viewportTheme === 'black' ? '⬜ GRAY BG' : '⬛ BLACK BG'}
+        </button>
+
+        <button
+          onClick={onTogglePallet}
+          title="show / hide the reference pallet model"
+          aria-pressed={palletVisible}
+          style={{ ...connBtn, ...(palletVisible ? connBtnGo : null) }}
+        >
+          {palletVisible ? '▨ PALLET' : '▧ PALLET'}
         </button>
 
         <LinkBadge
