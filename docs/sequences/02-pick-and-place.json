@@ -1,0 +1,17 @@
+[
+  { "type": "home" },
+  { "type": "tool", "tool": "gripper" },
+  { "type": "gripper", "open": true },
+  { "type": "movel", "pose": [350, -186.5, 250, 180, 0, -90] },
+  { "type": "movel", "pose": [0, 0, -210, 0, 0, 0], "frame": "rel" },
+  { "type": "wait", "seconds": 0.3 },
+  { "type": "gripper", "open": false },
+  { "type": "wait", "seconds": 0.4 },
+  { "type": "movel", "pose": [0, 0, 210, 0, 0, 0], "frame": "rel" },
+  { "type": "movel", "pose": [250, 120, 250, 180, 0, -90] },
+  { "type": "movel", "pose": [0, 0, -180, 0, 0, 0], "frame": "rel" },
+  { "type": "wait", "seconds": 0.3 },
+  { "type": "gripper", "open": true },
+  { "type": "movel", "pose": [0, 0, 180, 0, 0, 0], "frame": "rel" },
+  { "type": "home" }
+]
