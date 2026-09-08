@@ -14,6 +14,7 @@ venv/
 .DS_Store
 test-results/
 playwright-report/
+.dev-logs/
 backend/.omc/
 frontend/.omc/
 backend/.venv/

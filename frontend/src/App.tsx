@@ -4,20 +4,24 @@ import {
   allDoOff,
   emergencyStop,
   getHealth,
+  goHome,
   setGripperDo,
   setSuctionDo,
   setTool,
   type Health,
+  type PoseTuple,
   type ToolId,
 } from './api/client'
 import { useTelemetry } from './hooks/useTelemetry'
 import { useJointAnimation } from './hooks/useJointAnimation'
+import { useSequencePlayback } from './hooks/useSequencePlayback'
 import { useTheme } from './hooks/useTheme'
 import { useViewportTheme } from './hooks/useViewportTheme'
 import RobotViewer from './three/RobotViewer'
 import StatusBar from './components/StatusBar'
 import PosePanel from './components/PosePanel'
 import ToolPanel from './components/ToolPanel'
+import SequencePanel from './components/SequencePanel'
 import JointBars from './components/JointBars'
 import ViewportOverlays from './components/ViewportOverlays'
 import { checkSafety, nearLimitJoints } from './safety'
@@ -35,7 +39,7 @@ export default function App() {
   const { theme, toggleTheme } = useTheme()
   const { viewportTheme, toggleViewportTheme } = useViewportTheme()
   const { frame, link, stale } = useTelemetry()
-  const { jointsDeg, animateTo, stopAnimation } = useJointAnimation(frame?.q ?? null)
+  const { jointsDeg, animateTo, stopAnimation, holdTelemetry } = useJointAnimation(frame?.q ?? null)
 
   const linkLost = frame?.link_ok === false
   // A sim-mode controller with no physical arm attached reports this as its
@@ -83,11 +87,26 @@ export default function App() {
     })
   }
 
-  // Emergency stop: freeze the rendered twin immediately (cancel any in-flight
-  // IK animation), then command the controller to halt. Freezing first means
-  // the arm stops on screen the instant the button is pressed, even before the
-  // round-trip completes.
+  // Mock-mode JSON motion-sequence playback (right-sidebar panel).
+  const playback = useSequencePlayback({
+    mode: health?.mode ?? null,
+    tool,
+    animateTo,
+    holdTelemetry,
+    goHome,
+    seedJoints: () => jointsDeg,
+    seedPose: () => (frame?.p as PoseTuple | undefined) ?? null,
+    setGripper: toggleGripper,
+    setSuction: toggleSuction,
+    selectTool,
+  })
+
+  // Emergency stop: abort any running sequence, freeze the rendered twin
+  // immediately (cancel any in-flight IK animation), then command the controller
+  // to halt. Freezing first means the arm stops on screen the instant the button
+  // is pressed, even before the round-trip completes.
   const emergencyStopTwin = () => {
+    playback.abort()
     stopAnimation()
     return emergencyStop()
   }
@@ -198,6 +217,7 @@ export default function App() {
             onAllDoOff={turnAllDoOff}
           />
           <JointBars q={jointsDeg} warnJoints={warnJoints} />
+          <SequencePanel {...playback} />
           <div
             style={{
               marginTop: 'auto',
