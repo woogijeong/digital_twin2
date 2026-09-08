@@ -11,13 +11,19 @@ from app.robot.kinematics import JOINT_LIMITS_DEG, fk, ik, manipulability
 
 # Joint configurations across the workspace. Their FK poses are reachable by
 # construction, so IK must drive back to the same TCP pose (possibly via a
-# different arm branch).
+# different arm branch). The later cases sit far out / high up / folded in --
+# regions a weak seed set used to reject as "unreachable".
 JOINT_CASES = [
     [0.0, 0.0, -90.0, 0.0, -90.0, 0.0],  # the mock "ready" pose
     [30.0, -20.0, -70.0, 10.0, -80.0, 15.0],
     [-45.0, 30.0, 60.0, -20.0, 50.0, -30.0],
     [90.0, -40.0, -100.0, 0.0, -60.0, 0.0],
     [120.0, 20.0, 80.0, 40.0, 70.0, -50.0],
+    [15.0, 55.0, 55.0, 25.0, 60.0, -40.0],  # elbow out, reaching high
+    [-70.0, -55.0, -115.0, -30.0, -80.0, 25.0],  # folded to one side, low
+    [150.0, 30.0, 95.0, 55.0, 70.0, -60.0],  # extended, behind-ish
+    [40.0, 65.0, 35.0, 0.0, 95.0, 10.0],  # near-vertical extension
+    [-120.0, -25.0, -95.0, 45.0, -70.0, -80.0],  # wide swing, wrist rolled
 ]
 
 _NEUTRAL_SEED = [0.0, 0.0, -90.0, 0.0, -90.0, 0.0]

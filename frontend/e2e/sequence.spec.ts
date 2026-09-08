@@ -31,17 +31,19 @@ test('PLAY runs the sequence then holds the twin', async ({ page }) => {
 
   await expect(page.locator('header')).toContainText('MOCK')
   await page.getByLabel('motion sequence JSON').fill(THREE_MOVE)
-  const before = await jointRow(page)
+
+  const xCell = page.locator('text=X · mm').locator('xpath=following-sibling::div').first()
 
   await page.getByRole('button', { name: '▶ PLAY', exact: true }).click()
   await expect(page.locator('aside')).toContainText('done · 3 steps', { timeout: 15_000 })
 
-  // confirm it moved, settled, and does not drift once telemetry is held
+  // the last step is movel [400, 0, 500 …] — the twin ends there
   await page.waitForTimeout(500)
-  const after = await jointRow(page)
-  expect(after.some((v, i) => Math.abs(Number(v) - Number(before[i])) > 3)).toBe(true)
+  await expect(xCell).toHaveText(/^40[0-9]/)
+  // and holds (telemetry frozen after a program) — no drift
+  const held = await jointRow(page)
   await page.waitForTimeout(1000)
-  expect(await jointRow(page)).toEqual(after)
+  expect(await jointRow(page)).toEqual(held)
 
   expect(jsErrors, jsErrors.join('\n')).toHaveLength(0)
 })
