@@ -51,7 +51,11 @@ P0 MVP 이후 추가된 기능들입니다 (한국어로 정리):
 - **다크 / 라이트 모드 & 뷰포트 배경 전환** — 헤더에서 UI 전체를 라이트/다크로 전환할 수 있고, 3D 뷰포트 배경도 검정/회색 중 선택할 수 있습니다(그리드 색상도 배경에 맞춰 자동 보정). 3D 시야 자체는 항상 어둡게 유지되어 오버레이(TCP 좌표, 방향 기즈모 등)의 가독성은 그대로 보장됩니다.
 - **정확한 연결 상태 표시** — 헤더의 `LINKED`/`NOT LINKED` 배지가 이제 "텔레메트리가 흐르는지"가 아니라 "실제 로봇 컨트롤러에 연결되어 있는지"만을 나타냅니다. mock 모드에서는 항상 `NOT LINKED`로 표시됩니다.
 - **Manipulability(가동성 지수) 표시 + 컨트롤러 에러 복구** — 하단에 실시간 manipulability(자코비안 기반, 특이점에 가까울수록 0에 수렴)가 표시됩니다. 실제 컨트롤러가 충돌(COLLISION)이나 안전 위반(VIOLATE) 상태가 되면 TARGET POSE 패널에 경고 배너와 `RECOVER` 버튼이 나타나며, 이 버튼은 fault 플래그만 해제할 뿐 모션 명령이 아닙니다.
-- **그리퍼 / 석션 디지털 출력 제어** — 화면의 OPEN/CLOSE, ON/OFF 버튼이 실제 컨트롤러 연결 시 디지털 출력(DO0/DO1 = 그리퍼 열기/닫기, DO2 = 석션 on/off)을 그대로 토글합니다. 로봇 팔 자체를 움직이는 명령이 아니라 엔드 이펙터 밸브만 작동시키므로, 아래 "P0 never commands motion" 원칙과 별개로 안전하게 허용되어 있습니다.
+- **그리퍼 / 석션 디지털 출력 제어** — 화면의 OPEN/CLOSE, ON/OFF 버튼이 실제 컨트롤러 연결 시 디지털 출력(DO0/DO1 = 그리퍼 열기/닫기, DO2 = 석션 on/off)을 그대로 토글합니다. 로봇 팔 자체를 움직이는 명령이 아니라 엔드 이펙터 밸브만 작동시키므로, 아래 "P0 never commands motion" 원칙과 별개로 안전하게 허용되어 있습니다. 연결 시 그리퍼/석션의 실제 DO 상태를 읽어와 화면(버튼 하이라이트·3D 손가락)에 반영합니다.
+- **컨트롤러 상태를 바꾸지 않는 연결** — 트윈은 연결할 때 `set_simulation_mode`를 호출하지 않습니다. 컨트롤러가 어떤 모드든 그대로 두고 관찰만 하며, 실제 모드(`sim_mode`)를 텔레메트리로 받아 헤더에 `SIMULATION` / `LIVE`로 표시합니다. 모션 차단은 `_call` 허용 목록이 담당합니다. 툴 미선택 시 연결만으로 `set_tool_frame`을 쓰던 것도 제거했습니다.
+- **컨트롤러 링크 끊김 / fault 가시화** — 실기 gRPC 연결이 끊기면 화면이 마지막 프레임에 멈추지 않고 상단·헤더·패널에 "CONTROLLER LINK LOST" 경고를 표시하며 2초 간격으로 자동 재연결합니다. `op_state` fault도 VIOLATE/COLLISION 외에 E-stop·전원 off·수동복구 등을 사람이 읽을 수 있는 메시지로 표시합니다. 물리 로봇 팔 미연결(`is_robot_connected: false`)은 이 컨트롤러 셋업의 정상 상태라 경고가 아니라 하단 상태줄에 "arm offline"으로만 조용히 표시합니다.
+- **ALL DO OFF 버튼** — END EFFECTOR 패널 하단의 버튼 하나로 트윈이 다루는 모든 엔드 이펙터 디지털 출력(DO0·DO1 그리퍼 솔레노이드, DO2 석션 밸브)을 한 번에 LOW로 내립니다. 화면의 그리퍼/석션 표시도 함께 초기화됩니다.
+- **비상정지(E-STOP) 버튼** — 헤더의 빨간 `■ E-STOP` 버튼이 `stop_motion`(category-1, 제어 감속 후 브레이크)으로 컨트롤러 모션을 즉시 정지시킵니다. 동시에 진행 중인 IK 애니메이션을 취소해 화면상 팔도 버튼 누르는 즉시 멈춥니다. 이것은 트윈이 컨트롤러를 명령하는 **유일한 예외**입니다 — 모션을 *멈추기만* 하며 절대 시작시키지 않고, 실물 로봇을 지켜보는 작업자에게 필요한 안전 장치이기 때문입니다. 정지 후 컨트롤러가 보고하는 STOP 상태는 기존 fault 배너 + `RECOVER` 버튼으로 처리됩니다.
 
 ## 실행 방법 (한국어)
 
@@ -128,7 +132,7 @@ pnpm dev              # -> http://localhost:5173 접속
 │ Frontend — Vite + React + TS │ HTTP │ Backend — FastAPI (Python)    │ gRPC │ Indy controller /     │
 │                              │─────▶│                               │─────▶│ simulator            │
 │ • three.js + urdf-loader     │ REST │ RobotService (interface)      │      │ 192.168.3.4          │
-│   → Indy7 3D viewer          │      │  ├─ IndyDCP3Robot (real)      │      │ (simulation mode)    │
+│   → Indy7 3D viewer          │      │  ├─ IndyDCP3Robot (real)      │      │ (mode left as-is)    │
 │ • TCP pose panel + IK input  │◀────▶│  └─ MockRobot   (offline)     │      │ neuromeka SDK        │
 │ • per-joint bars, status bar │  WS  │ GET /api/health /pose /state  │      └──────────────────────┘
 │                              │      │ POST /api/ik                  │
@@ -140,10 +144,18 @@ pnpm dev              # -> http://localhost:5173 접속
   own `inverse_kin` / `forward_kin`, so the twin matches the real robot. Euler
   angles are shown exactly as the controller reports them (no convention
   conversion).
-- **P0 never commands motion.** On connect the controller is put into
-  `set_simulation_mode(True)`; there is no `movej` / `movel` in any P0 code path
-  (enforced by a test). `RESET TO HOME` is a mock-only convenience — against a
-  real controller it returns `409`.
+- **P0 never commands a move and never changes the controller's state on
+  connect.** It does not call `set_simulation_mode` — the twin observes whatever
+  mode the controller is in and shows it in the header (`SIMULATION` / `LIVE`).
+  There is no `movej` / `movel` in any P0 code path (enforced by a test).
+  `RESET TO HOME` is a mock-only convenience — against a real controller it
+  returns `409`.
+- **The one exception: E-STOP.** The header's red `■ E-STOP` button
+  (`POST /api/estop` → `stop_motion`, category-1) is the sole call that commands
+  the controller — an operator safety control that *halts* motion and can never
+  start one. The frontend also cancels any in-flight IK animation so the twin
+  freezes on screen immediately. `ALL DO OFF` (in the END EFFECTOR panel) drives
+  every gripper/suction digital output LOW in one click.
 - **End effector.** `NONE` / `SUCTION` / `GRIPPER` (`POST /api/tool`) shifts the
   TCP the kinematics report to the tool tip and renders procedural tool geometry
   on the flange; the gripper has an open/close toggle. Connected to a real
@@ -212,7 +224,8 @@ CI (`.github/workflows/ci.yml`) runs `test:api` + `test:web` + `test:e2e` on eve
 ## Connecting to the real controller
 
 See [`docs/hardware-check.md`](docs/hardware-check.md) for the manual checklist
-(simulation-mode connection, live mirroring, FK round-trip check).
+(connection without changing the controller's mode, live mirroring, FK
+round-trip check).
 
 ## Layout
 

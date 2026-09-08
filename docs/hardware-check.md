@@ -4,8 +4,11 @@ The automated suite runs entirely against `MockRobot`. This checklist is the
 manual verification against a real IndyDCP3 controller or the Neuromeka
 simulator, and must be run once before claiming real-mode support.
 
-> The app forces `set_simulation_mode(True)` on connect and issues no motion
-> commands, so this is safe to run against a physical robot. Still, keep the
+> The app issues no motion commands and does not change the controller's mode on
+> connect (it never calls `set_simulation_mode`). It is read-only + kinematics,
+> so it is safe to run against a physical robot — but it will **not** put the
+> controller into simulation mode for you. If you want the physical arm to stay
+> put regardless, put the controller in simulation mode yourself first. Keep the
 > e-stop within reach.
 
 ## 1. Connectivity
@@ -13,8 +16,9 @@ simulator, and must be run once before claiming real-mode support.
 - [ ] Controller / simulator reachable: `ping 192.168.3.4`
 - [ ] Start real mode: `INDY_HOST=192.168.3.4 pnpm dev`
 - [ ] `curl http://localhost:8000/api/health` → `{"mode":"real","connected":true,"model":"indy7"}`
-- [ ] Backend log shows `connected to controller 192.168.3.4 (simulation mode)`
-- [ ] UI header shows `SIMULATION` (not `MOCK`) and `LINKED`
+- [ ] Backend log shows `connected to controller 192.168.3.4 (mode left unchanged)`
+- [ ] UI header shows `LINKED` and the controller's real mode: `SIMULATION` if
+      the controller is simulating, `LIVE` if it is not (never `MOCK`)
 
 ## 2. Live mirroring
 
@@ -41,10 +45,12 @@ simulator, and must be run once before claiming real-mode support.
 
 - [ ] Enter a reachable target pose in the UI, `APPLY TARGET` → the model
       animates (~1 s) to the IK solution.
-- [ ] **Expected on real hardware:** P0 issues no motion command, so the real
-      robot stays put; ~1 s after the animation the model snaps back to the live
-      (unchanged) pose. This confirms IK solved correctly but is not commanded.
-      Commanding the move is P1. (In mock mode the model holds the new pose.)
+- [ ] **Expected on real hardware:** P0 issues no motion command, so the
+      controller stays put; ~1 s after the animation the model snaps back to the
+      live (unchanged) pose. This confirms IK solved correctly but is not
+      commanded. Commanding the move is P1. (In mock mode the model holds the new
+      pose.) Note P0 does not force simulation mode — if the controller is live,
+      "stays put" means P0 sent nothing, not that motion was blocked downstream.
 - [ ] Enter an obviously unreachable target (e.g. X = 5000) → inline
       `IK: ...` message appears, model does not jump.
 

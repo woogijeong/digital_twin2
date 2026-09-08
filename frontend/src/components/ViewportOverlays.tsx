@@ -8,14 +8,26 @@ interface Props {
   /** telemetry gone quiet -> dim the readout */
   stale: boolean
   alerts?: SafetyAlert[]
+  /** backend has lost the controller link and is reconnecting */
+  linkLost?: boolean
+  /** active controller fault message from telemetry (op_state), if any */
+  fault?: string | null
 }
 
 /** Non-interactive HUD drawn over the 3D canvas. */
-export default function ViewportOverlays({ pose, stale, alerts }: Props) {
+export default function ViewportOverlays({ pose, stale, alerts, linkLost, fault }: Props) {
   const collision = alerts?.find((a) => a.kind === 'collision')
+  // One banner, most urgent first: link loss > controller fault. A detached
+  // physical arm (is_robot_connected: false) is the normal state for a
+  // sim-mode controller and is not raised here -- see the footer status line.
+  const banner = linkLost ? '⚠ CONTROLLER LINK LOST — reconnecting…' : fault ? `⚠ ${fault}` : null
   return (
     <>
-      {collision && <div style={collisionBanner}>⚠ {collision.message}</div>}
+      {banner ? (
+        <div style={linkBanner}>{banner}</div>
+      ) : (
+        collision && <div style={collisionBanner}>⚠ {collision.message}</div>
+      )}
 
       <div
         style={{
@@ -64,4 +76,23 @@ const collisionBanner: CSSProperties = {
   color: T.amber,
   whiteSpace: 'nowrap',
   pointerEvents: 'none',
+}
+const linkBanner: CSSProperties = {
+  position: 'absolute',
+  left: '50%',
+  top: 24,
+  transform: 'translateX(-50%)',
+  padding: '8px 16px',
+  background: 'rgba(242,176,61,0.22)',
+  border: `1px solid ${T.amber}`,
+  borderRadius: 6,
+  fontFamily: T.fontMono,
+  fontSize: 12,
+  fontWeight: 600,
+  letterSpacing: '0.04em',
+  color: T.amber,
+  whiteSpace: 'nowrap',
+  pointerEvents: 'none',
+  boxShadow: '0 2px 18px rgba(0,0,0,0.45)',
+  animation: 'blink 1.4s steps(2) infinite',
 }

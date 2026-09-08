@@ -65,16 +65,29 @@ async def health(request: Request) -> HealthResponse:
     return _health(request)
 
 
+def _unavailable(exc: Exception) -> HTTPException:
+    return HTTPException(
+        status_code=503,
+        detail={"error": "controller_unavailable", "detail": str(exc)},
+    )
+
+
 @router.get("/pose", response_model=PoseDTO)
 async def pose(request: Request) -> PoseDTO:
-    return await _robot(request).get_pose()
+    try:
+        return await _robot(request).get_pose()
+    except Exception as exc:  # noqa: BLE001 - controller/channel down; report it, don't 500
+        raise _unavailable(exc) from exc
 
 
 @router.get("/state", response_model=StateResponse)
 async def state(request: Request) -> StateResponse:
     robot = _robot(request)
-    q = await robot.get_joints()
-    p = (await robot.get_pose()).as_list()
+    try:
+        q = await robot.get_joints()
+        p = (await robot.get_pose()).as_list()
+    except Exception as exc:  # noqa: BLE001 - controller/channel down; report it, don't 500
+        raise _unavailable(exc) from exc
     return StateResponse(q=q, p=p)
 
 
@@ -155,3 +168,22 @@ async def gripper(request: Request, body: GripperRequest) -> dict:
 async def suction(request: Request, body: SuctionRequest) -> dict:
     await _robot(request).set_suction(body.on)
     return {"status": "ok", "on": body.on}
+
+
+@router.post("/do/all-off")
+async def all_do_off(request: Request) -> dict:
+    """Drive every end-effector digital output LOW (gripper solenoids + suction)."""
+    await _robot(request).set_all_do_off()
+    return {"status": "ok"}
+
+
+@router.post("/estop")
+async def estop(request: Request) -> dict:
+    """Emergency stop: command the controller to halt all motion immediately."""
+    try:
+        await _robot(request).emergency_stop()
+    except RobotUnavailable as exc:
+        raise HTTPException(
+            status_code=502, detail={"error": "estop_failed", "detail": str(exc)}
+        ) from exc
+    return {"status": "ok"}

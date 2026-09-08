@@ -50,7 +50,7 @@ def test_connect_then_disconnect_round_trip(client, monkeypatch):
     body = r.json()
     assert body["mode"] == "real"
     assert body["host"] == "10.0.0.9"
-    indy.set_simulation_mode.assert_called_once_with(True)
+    indy.set_simulation_mode.assert_not_called()  # connecting never changes the controller mode
 
     # telemetry keeps flowing from the newly connected controller
     with client.websocket_connect("/ws/telemetry") as ws:

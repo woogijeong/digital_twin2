@@ -95,6 +95,23 @@ class RobotService(abc.ABC):
         the offline mock."""
 
     @abc.abstractmethod
+    async def set_all_do_off(self) -> None:
+        """Drive every end-effector digital output the twin controls LOW
+        (gripper open/close solenoids DO0/DO1 and the suction valve DO2 on the
+        real controller). A single "all tool I/O off" action; not motion. No-op
+        for services with no physical I/O (the offline mock)."""
+
+    @abc.abstractmethod
+    async def emergency_stop(self) -> None:
+        """Command the controller to halt all motion immediately (a category-1
+        stop: controlled deceleration, then brake).
+
+        This is the twin's ONE deliberate exception to the passive-observer
+        rule -- an operator safety control that must be able to stop a real
+        robot. It never solves or commands a *move*; it only stops one. For the
+        offline mock it just freezes the twin where it is (no physical arm)."""
+
+    @abc.abstractmethod
     async def recover(self) -> None:
         """Clear an active controller fault (e.g. a collision/violation stop).
 

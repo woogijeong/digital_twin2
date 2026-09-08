@@ -6,8 +6,15 @@ import type { LinkState } from '../hooks/useTelemetry'
 interface Props {
   health: Health | null
   link: LinkState
+  /** backend has lost the controller link and is reconnecting (from telemetry) */
+  linkLost?: boolean
+  /** controller's own simulation-mode flag from telemetry; false = a live
+   *  controller. null/undefined until the first frame (assume simulation). */
+  simulation?: boolean | null
   /** Called with the fresh health after a connect / disconnect. */
   onHealthChange: (h: Health) => void
+  /** Fire an emergency stop: halt controller motion and freeze the twin. */
+  onEmergencyStop: () => Promise<void>
   theme: 'dark' | 'light'
   onToggleTheme: () => void
   viewportTheme: ViewportTheme
@@ -17,16 +24,36 @@ interface Props {
 export default function StatusBar({
   health,
   link,
+  linkLost,
+  simulation,
   onHealthChange,
+  onEmergencyStop,
   theme,
   onToggleTheme,
   viewportTheme,
   onToggleViewportTheme,
 }: Props) {
   const mock = health?.mode === 'mock'
+  // A real controller reports its own mode; the twin never sets it. Until the
+  // first frame arrives, assume simulation (the conservative label).
+  const modeLabel = mock ? 'MOCK' : simulation === false ? 'LIVE' : 'SIMULATION'
   const [hostEdit, setHostEdit] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const [estopBusy, setEstopBusy] = useState(false)
+  const [estopErr, setEstopErr] = useState<string | null>(null)
+
+  const triggerEstop = async () => {
+    setEstopBusy(true)
+    setEstopErr(null)
+    try {
+      await onEmergencyStop()
+    } catch (e) {
+      setEstopErr(e instanceof ApiError ? e.detail : 'e-stop failed')
+    } finally {
+      setEstopBusy(false)
+    }
+  }
 
   const host = hostEdit ?? health?.host ?? ''
 
@@ -49,14 +76,23 @@ export default function StatusBar({
 
   return (
     <header style={header}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
         <span style={dot} />
         <span style={brand}>INDY7 · DIGITAL TWIN</span>
+        <button
+          onClick={triggerEstop}
+          disabled={estopBusy}
+          title={estopErr ?? 'emergency stop — halt all controller motion now'}
+          style={{ ...estopBtn, ...(estopErr ? estopBtnErr : null) }}
+        >
+          {estopBusy ? 'STOPPING…' : '■ E-STOP'}
+        </button>
+        {estopErr && <span style={errText}>{estopErr}</span>}
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 12 }}>
         <span style={{ ...badge, borderColor: mock ? T.badgeBorderMock : T.badgeBorderSim }}>
-          {mock ? 'MOCK' : 'SIMULATION'}
+          {modeLabel}
         </span>
 
         {mock ? (
@@ -96,7 +132,11 @@ export default function StatusBar({
           {viewportTheme === 'black' ? '⬜ GRAY BG' : '⬛ BLACK BG'}
         </button>
 
-        <LinkBadge link={link} real={health?.mode === 'real' && health.connected} />
+        <LinkBadge
+          link={link}
+          real={health?.mode === 'real' && health.connected}
+          linkLost={!!linkLost}
+        />
       </div>
     </header>
   )
@@ -104,14 +144,19 @@ export default function StatusBar({
 
 /** "LINKED" means connected to the real controller -- a mock session never
  *  claims to be linked, even while its (own, offline) telemetry is flowing. */
-function LinkBadge({ link, real }: { link: LinkState; real: boolean }) {
-  const map = {
-    connecting: { text: 'CONNECTING', color: T.muted, blink: false },
-    linked: real
-      ? { text: 'LINKED', color: T.green, blink: false }
-      : { text: 'NOT LINKED', color: T.muted, blink: false },
-    reconnecting: { text: 'RECONNECTING', color: T.amber, blink: true },
-  }[link]
+function LinkBadge({ link, real, linkLost }: { link: LinkState; real: boolean; linkLost: boolean }) {
+  // A lost controller link wins over the socket-level state: the browser
+  // WebSocket is still up (link-lost frames keep arriving), so `link` reads
+  // "linked" even though the twin can't reach the controller.
+  const map = linkLost
+    ? { text: 'LINK LOST', color: T.amber, blink: true }
+    : {
+        connecting: { text: 'CONNECTING', color: T.muted, blink: false },
+        linked: real
+          ? { text: 'LINKED', color: T.green, blink: false }
+          : { text: 'NOT LINKED', color: T.muted, blink: false },
+        reconnecting: { text: 'RECONNECTING', color: T.amber, blink: true },
+      }[link]
 
   return (
     <span
@@ -188,6 +233,22 @@ const connBtnGo: CSSProperties = {
 const connBtnErr: CSSProperties = {
   border: `1px solid ${T.amber}`,
   color: T.amber,
+}
+const estopBtn: CSSProperties = {
+  background: T.red,
+  border: `1px solid ${T.red}`,
+  color: T.onRed,
+  borderRadius: 6,
+  padding: '6px 14px',
+  fontFamily: T.fontMono,
+  fontWeight: 700,
+  fontSize: 11,
+  letterSpacing: '0.14em',
+  cursor: 'pointer',
+}
+const estopBtnErr: CSSProperties = {
+  background: 'transparent',
+  color: T.red,
 }
 const errText: CSSProperties = {
   fontFamily: T.fontMono,

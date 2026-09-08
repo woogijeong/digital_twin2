@@ -18,6 +18,9 @@ interface Props {
   mode: 'real' | 'mock' | null
   /** Active controller fault from live telemetry, if any. */
   error: string | null
+  /** backend has lost the controller link — show the fault text but not RECOVER
+   *  (which cannot help a dead connection; the twin re-dials on its own). */
+  linkLost?: boolean
 }
 
 const ZEROS = ['0', '0', '0', '0', '0', '0']
@@ -34,7 +37,7 @@ function resolveInFrame(frame: Frame, current: PoseTuple, delta: PoseTuple): Pos
   return frame === 'tool' ? resolveToolRelative(current, delta) : resolveRelative(current, delta)
 }
 
-export default function PosePanel({ pose, jointsDeg, stale, onApply, mode, error }: Props) {
+export default function PosePanel({ pose, jointsDeg, stale, onApply, mode, error, linkLost }: Props) {
   const [target, setTarget] = useState<string[] | null>(null)
   const [frame, setFrame] = useState<Frame>('abs')
   const [busy, setBusy] = useState(false)
@@ -204,10 +207,18 @@ export default function PosePanel({ pose, jointsDeg, stale, onApply, mode, error
         {error && (
           <div style={faultBanner}>
             <div style={faultText}>⚠ {error}</div>
-            <button onClick={recover} disabled={recovering} style={recoverBtn}>
-              {recovering ? 'RECOVERING…' : '⟲ RECOVER'}
-            </button>
-            {recoverErr && <div style={faultText}>recover failed: {recoverErr}</div>}
+            {linkLost ? (
+              <div style={{ ...faultText, marginBottom: 0 }}>
+                the twin is reconnecting automatically — check the controller
+              </div>
+            ) : (
+              <>
+                <button onClick={recover} disabled={recovering} style={recoverBtn}>
+                  {recovering ? 'RECOVERING…' : '⟲ RECOVER'}
+                </button>
+                {recoverErr && <div style={faultText}>recover failed: {recoverErr}</div>}
+              </>
+            )}
           </div>
         )}
         {err && (

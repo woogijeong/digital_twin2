@@ -73,6 +73,19 @@ export function setSuctionDo(on: boolean): Promise<void> {
   return postJson('/api/suction', { on }) as Promise<void>
 }
 
+/** Drive every end-effector digital output LOW on the real controller
+ *  (gripper solenoids DO0/DO1 + suction valve DO2). No-op on the mock. */
+export function allDoOff(): Promise<void> {
+  return postJson('/api/do/all-off') as Promise<void>
+}
+
+/** Emergency stop: command the controller to halt all motion immediately
+ *  (category-1 stop). The twin's one motion-affecting call — it stops a move,
+ *  never starts one. Throws {@link ApiError} if the call itself fails. */
+export function emergencyStop(): Promise<void> {
+  return postJson('/api/estop') as Promise<void>
+}
+
 /** Send the twin to its home pose; resolves to the home joint angles (deg).
  *  Throws {@link ApiError} against a real controller (P0 never commands motion). */
 export async function goHome(): Promise<number[]> {

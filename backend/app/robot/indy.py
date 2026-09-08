@@ -1,14 +1,19 @@
 """IndyDCP3-backed robot service.
 
 Wraps the synchronous ``neuromeka`` gRPC client. Every SDK call is pushed to a
-worker thread so the event loop is never blocked. The controller is put into
-**simulation mode** on connect -- P0 mirrors and solves kinematics but never
-commands real motion.
+worker thread so the event loop is never blocked. Connecting never changes the
+controller's state (it does not touch ``set_simulation_mode``): P0 mirrors and
+solves kinematics but never commands a real *move*, enforced by the ``_call``
+allow-list. The sole exception is ``emergency_stop`` -- an operator safety
+control that halts motion (``stop_motion``); it stops a move, never starts one.
+Whatever mode the controller is actually in is reported back in the telemetry
+frame (``simulation``) and shown in the header.
 """
 
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from collections.abc import AsyncIterator
 
@@ -22,33 +27,73 @@ from app.robot.base import (
 from app.robot.tools import TOOL_EXTRA_MM, tool_frame_fpos
 from app.schemas import PoseDTO, TelemetryFrame
 
-# P0 is read + kinematics + the TCP tool frame + fault recovery. Every SDK
-# call goes through ``_call`` and only these may pass -- so no code path (or
-# future edit) can command physical motion (``movej`` / ``movel`` / teleop),
-# whatever string it hands to ``_call``. ``set_tool_frame`` is a TCP-reference
-# config, not motion; ``recover`` only clears a fault flag (e.g. after a
-# collision stop) -- it does not move the robot either; ``set_do`` toggles
-# end-effector I/O (the gripper/suction solenoids) -- it actuates the *tool*,
-# not the arm, so it's not motion either.
+log = logging.getLogger("indy_twin.robot")
+
+# P0 is read + kinematics + the TCP tool frame + fault recovery + an emergency
+# stop. Every SDK call goes through ``_call`` and only these may pass -- so no
+# code path (or future edit) can command a physical *move* (``movej`` /
+# ``movel`` / teleop), whatever string it hands to ``_call``. ``set_tool_frame``
+# is a TCP-reference config, not motion; ``recover`` only clears a fault flag
+# (e.g. after a collision stop) -- it does not move the robot either; ``set_do``
+# toggles end-effector I/O (the gripper/suction solenoids) -- it actuates the
+# *tool*, not the arm, so it's not motion either. ``get_do`` is a read of those
+# same digital outputs -- so the twin can mirror the live gripper / suction
+# state. ``stop_motion`` is the deliberate exception: it *halts* motion for an
+# operator emergency stop -- it stops a move, it can never start one.
+# ``set_simulation_mode`` is deliberately absent: connecting must not change
+# the controller's operating mode -- the twin observes whatever mode it finds.
 _ALLOWED_SDK_CALLS = frozenset(
     {
         "get_control_data",
         "get_control_state",
+        "get_do",
         "inverse_kin",
         "forward_kin",
-        "set_simulation_mode",
         "set_tool_frame",
         "recover",
         "set_do",
+        "stop_motion",
     }
 )
 
-# OpState codes (neuromeka.enums.OpState) that mean the controller has
-# faulted and needs `recover()` before it will report anything useful again.
+# Digital-output addresses the twin drives (see ``set_gripper`` / ``set_suction``).
+_DO_GRIPPER_OPEN = 0  # DO0 HIGH = gripper open
+_DO_GRIPPER_CLOSE = 1  # DO1 HIGH = gripper close (latching pair with DO0)
+_DO_SUCTION = 2  # DO2 HIGH = suction on
+
+# neuromeka StopCategory for ``stop_motion``: 0 = IMMEDIATE_BRAKE, 1 = SMOOTH_BRAKE
+# (controlled decel then brake), 2 = SMOOTH_ONLY. The E-STOP button uses a
+# category-1 stop. Spelled as a literal so the module never has to import the
+# SDK's proto enums just to name a constant.
+_STOP_CATEGORY_SMOOTH_BRAKE = 1
+_DO_STATE_ON = 1  # neuromeka DigitalState: 0 = OFF, 1 = ON, 2 = UNUSED
+
+# How often to poll digital outputs while streaming (s). Gripper/suction state
+# changes rarely, so this runs well below the telemetry rate.
+_DO_POLL_INTERVAL_S = 0.25
+
+# OpState codes (neuromeka.enums.OpState) the operator should see. Some clear
+# with `recover()` (VIOLATE / COLLISION), others need action at the controller
+# (E-stop release, manual recovery, power-on). Anything not listed here --
+# SYSTEM_ON(1), IDLE(5), MOVING(6), TEACHING(7), COMPLIANCE(10) -- is a normal
+# operating state and reports no error.
 _FAULT_MESSAGES = {
-    2: "SAFETY VIOLATION",  # OpState.VIOLATE
-    8: "COLLISION DETECTED",  # OpState.COLLISION
+    0: "CONTROLLER SYSTEM OFF",  # OpState.SYSTEM_OFF
+    2: "SAFETY VIOLATION",  # OpState.VIOLATE -- clears with RECOVER
+    3: "RECOVERING (HARD) -- controller is clearing a fault",  # OpState.RECOVER_HARD
+    4: "RECOVERING (SOFT) -- controller is clearing a fault",  # OpState.RECOVER_SOFT
+    8: "COLLISION DETECTED",  # OpState.COLLISION -- clears with RECOVER
+    9: "EMERGENCY STOP -- controller stopped and powered off",  # OpState.STOP_AND_OFF
+    15: "HARD SAFETY VIOLATION -- controller powered off",  # OpState.POWER_OFF / VIOLATE_HARD
+    16: "MANUAL RECOVERY REQUIRED at the teach pendant",  # OpState.MANUAL_RECOVER
 }
+
+# Emitted while the gRPC channel to the controller is down. Distinct from a
+# controller-reported fault: RECOVER cannot help, the twin just keeps re-dialing.
+_LINK_LOST_MESSAGE = "CONTROLLER LINK LOST -- reconnecting..."
+
+# Floor between re-dial attempts while the link is down, seconds.
+_REDIAL_INTERVAL_S = 2.0
 
 
 class IndyDCP3Robot(RobotService):
@@ -80,8 +125,9 @@ class IndyDCP3Robot(RobotService):
         from neuromeka import IndyDCP3
 
         indy = IndyDCP3(self._host)
-        # Safety gate: never let P0 drive the physical robot.
-        indy.set_simulation_mode(True)
+        # Connecting must not change the controller's state -- P0 only reads and
+        # solves kinematics (motion is blocked by the ``_call`` allow-list), so
+        # the controller's simulation mode is left exactly as we find it.
         # Touch the control channel so a dead host fails here, not later.
         indy.get_control_data()
         return indy
@@ -132,30 +178,114 @@ class IndyDCP3Robot(RobotService):
     async def set_tool(self, tool: str) -> None:
         if tool not in TOOL_EXTRA_MM:
             raise ValueError(f"unknown tool {tool!r}")
+        if tool == self.tool:
+            return  # no change -> don't write the tool frame to the controller
         # Configures the controller's TCP reference; not a motion command.
         await self._call("set_tool_frame", tool_frame_fpos(tool))
         self.tool = tool
 
     async def set_gripper(self, open: bool) -> None:
         # DO0/DO1 are a latching dual-solenoid pair -- exactly one is HIGH.
-        await self._call("set_do", [(0, open), (1, not open)])
+        await self._call("set_do", [(_DO_GRIPPER_OPEN, open), (_DO_GRIPPER_CLOSE, not open)])
 
     async def set_suction(self, on: bool) -> None:
-        await self._call("set_do", [(2, on)])
+        await self._call("set_do", [(_DO_SUCTION, on)])
+
+    async def set_all_do_off(self) -> None:
+        # De-energise every end-effector output in one write: both gripper
+        # solenoids and the suction valve go LOW.
+        await self._call(
+            "set_do",
+            [(_DO_GRIPPER_OPEN, False), (_DO_GRIPPER_CLOSE, False), (_DO_SUCTION, False)],
+        )
 
     async def recover(self) -> None:
         await self._call("recover")
 
+    async def emergency_stop(self) -> None:
+        # Category-1 stop (SMOOTH_BRAKE): controlled decel, then brake. The twin's
+        # one motion-affecting command -- it stops the arm, it never moves it.
+        await self._call("stop_motion", _STOP_CATEGORY_SMOOTH_BRAKE)
+
+    async def _redial(self) -> None:
+        """Best-effort reconnect of a dropped gRPC channel. Silent on failure --
+        the stream loop keeps emitting link-lost frames until it succeeds."""
+        try:
+            self._indy = await asyncio.wait_for(
+                asyncio.to_thread(self._blocking_connect),
+                timeout=settings.connect_timeout_s,
+            )
+        except Exception as exc:  # noqa: BLE001 - SDK raises a grab-bag of errors
+            log.debug("controller re-dial failed: %s", exc)
+
+    async def _read_do(self) -> tuple[bool | None, bool | None]:
+        """Live (gripper_open, suction_on) from the controller's digital outputs.
+        ``None`` for an output that is not configured (state UNUSED)."""
+        res = await self._call("get_do")
+        by_addr = {int(s["address"]): int(s["state"]) for s in res.get("signals", [])}
+
+        def state(addr: int) -> bool | None:
+            raw = by_addr.get(addr)
+            return None if raw is None or raw not in (0, 1) else raw == _DO_STATE_ON
+
+        return state(_DO_GRIPPER_OPEN), state(_DO_SUCTION)
+
     async def stream(self) -> AsyncIterator[TelemetryFrame]:
         period = 1.0 / max(settings.telemetry_hz, 1.0)
+        last_q = [0.0] * 6
+        last_p = [0.0] * 6
+        last_redial = 0.0
+        last_do_poll = 0.0
+        gripper_open: bool | None = None
+        suction_on: bool | None = None
         while True:
-            data = await self._call("get_control_data")
-            state = await self._call("get_control_state")
+            try:
+                data = await self._call("get_control_data")
+                state = await self._call("get_control_state")
+            except Exception as exc:  # noqa: BLE001 - channel/SDK failure; surface it, keep polling
+                if self._connected:
+                    self._connected = False
+                    log.warning("controller link lost: %s", exc)
+                yield TelemetryFrame(
+                    q=last_q,
+                    p=last_p,
+                    ts=time.time(),
+                    manipulability=0.0,
+                    error=_LINK_LOST_MESSAGE,
+                    link_ok=False,
+                    robot_connected=False,
+                )
+                now = time.monotonic()
+                if now - last_redial >= _REDIAL_INTERVAL_S:
+                    last_redial = now
+                    await self._redial()
+                await asyncio.sleep(period)
+                continue
+
+            if not self._connected:
+                self._connected = True
+                log.info("controller link restored")
+            last_q = list(data["q"])
+            last_p = list(data["p"])
+
+            now = time.monotonic()
+            if now - last_do_poll >= _DO_POLL_INTERVAL_S:
+                last_do_poll = now
+                try:
+                    gripper_open, suction_on = await self._read_do()
+                except Exception as exc:  # noqa: BLE001 - a DO read hiccup must not drop the frame
+                    log.debug("digital-output read failed: %s", exc)
+
             yield TelemetryFrame(
-                q=list(data["q"]),
-                p=list(data["p"]),
+                q=last_q,
+                p=last_p,
                 ts=time.time(),
                 manipulability=float(state.get("manipulability", 0.0)),
                 error=_FAULT_MESSAGES.get(int(data.get("op_state", 0))),
+                link_ok=True,
+                robot_connected=bool(data.get("is_robot_connected", True)),
+                gripper_open=gripper_open,
+                suction_on=suction_on,
+                simulation=bool(data["sim_mode"]) if "sim_mode" in data else None,
             )
             await asyncio.sleep(period)
