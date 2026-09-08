@@ -1,0 +1,6 @@
+[
+  { "type": "home" },
+  { "type": "movej", "jpos": [0, -15, -110, 0, -55, 0] },
+  { "type": "movel", "pose": [400, 0, 500, 180, 0, -90] },
+  { "type": "movel", "pose": [0, 0, -120, 0, 0, 0], "frame": "tool" }
+]

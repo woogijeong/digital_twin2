@@ -34,6 +34,11 @@ _JOINT_ORIGINS: list[tuple[tuple[float, float, float], tuple[float, float, float
 # Bare-flange TCP: link6 -> tcp from the URDF. A tool extends this along +Z.
 _FLANGE_TCP_M = 0.06
 
+# Sum of the link lengths from the base (metres) -- an absolute upper bound on
+# reach. A target further than this from the base origin cannot possibly be
+# solved, so the IK solver rejects it up front instead of grinding every seed.
+_MAX_REACH_M = 1.5
+
 # URDF revolute limits, joint0..joint5, in degrees (±175° for J1-J5, ±215° J6).
 JOINT_LIMITS_DEG: list[float] = [175.0, 175.0, 175.0, 175.0, 175.0, 215.0]
 
@@ -188,6 +193,11 @@ def _pose_residual(
     return err, math.hypot(*err[:3]) * 1000.0, math.degrees(math.hypot(*err[3:]))
 
 
+# Task-error score used to rank descent states and accept LM steps.
+def _score(pos_mm: float, rot_deg: float) -> float:
+    return pos_mm + rot_deg
+
+
 def _solve_from_seed(
     seed_rad: list[float],
     tgt_pos: tuple[float, float, float],
@@ -219,7 +229,7 @@ def _solve_from_seed(
             dq = [v * (0.5 / biggest) for v in dq]
         trial = [q[i] + dq[i] for i in range(6)]
         t_err, t_pos_mm, t_rot_deg = _pose_residual(trial, tgt_pos, tgt_rot, tcp_z)
-        if t_pos_mm + t_rot_deg < pos_mm + rot_deg:
+        if _score(t_pos_mm, t_rot_deg) < _score(pos_mm, rot_deg):
             q, err, pos_mm, rot_deg = trial, t_err, t_pos_mm, t_rot_deg
             lam = max(lam * 0.5, 1e-9)
         else:
@@ -227,66 +237,144 @@ def _solve_from_seed(
     return q, pos_mm, rot_deg
 
 
+def _wrap(a: float) -> float:
+    return math.atan2(math.sin(a), math.cos(a))
+
+
+def _ik_seeds(seed_deg: list[float], target_pose: list[float]) -> list[list[float]]:
+    """Seed configurations for the IK descent, ordered cheapest-first.
+
+    The caller's seed comes first (an incremental target move converges straight
+    from it). The rest are a structured sweep over shoulder azimuth (toward the
+    target and its mirror), shoulder pitch, elbow bend, and two wrist flips --
+    enough to land at least one seed in the basin of an in-limit branch for any
+    reachable pose, since this is a local solver with no analytic branch
+    enumeration.
+    """
+    az = math.atan2(target_pose[1], target_pose[0])
+    seeds = [[math.radians(v) for v in seed_deg]]
+    for base in (az, _wrap(az + math.pi)):
+        for j1 in (-1.4, -0.6, 0.3, 1.2):
+            for j2 in (-2.3, -1.4, -0.5):
+                # keep the flange roughly level so the wrist joints have room to
+                # orient the tool toward the target.
+                j4 = _wrap(-j1 - j2 - _HALF_PI)
+                for j3, j5 in ((0.0, 0.0), (math.pi, 0.0)):
+                    seeds.append([_wrap(base), j1, j2, j3, _wrap(j4), j5])
+    return seeds
+
+
+def _in_limits(q_deg: list[float]) -> int | None:
+    """Index of the first joint outside its limit (wrapping ±360° where that
+    helps), or ``None`` if every joint is in range. Mutates ``q_deg`` in place."""
+    for i, lim in enumerate(JOINT_LIMITS_DEG):
+        v = q_deg[i]
+        if v > lim and v - 360.0 >= -lim - 1e-6:
+            v = q_deg[i] = v - 360.0
+        elif v < -lim and v + 360.0 <= lim + 1e-6:
+            v = q_deg[i] = v + 360.0
+        if abs(v) > lim + 1e-6:
+            return i
+    return None
+
+
 def ik(
     target_pose: list[float],
     seed_deg: list[float],
     *,
     tcp_offset_mm: float = _FLANGE_TCP_M * 1000.0,
-    max_iters: int = 160,
-    tol_pos_mm: float = 0.05,
-    tol_rot_deg: float = 0.01,
+    max_iters: int = 220,
+    tol_pos_mm: float = 0.5,
+    tol_rot_deg: float = 0.2,
 ) -> list[float]:
     """Joint solution (deg) whose FK reaches ``target_pose``, seeded from ``seed_deg``.
 
-    Levenberg-Marquardt descent. The caller's seed is tried first (an incremental
-    target move always converges from it); if it stalls, a few fallback seeds
-    around the target azimuth and its elbow-up / elbow-down / mirror branches are
-    tried. This is a local solver, not a full analytic IK -- a cold seed to a pose
-    on a distant arm branch can still miss. Raises :class:`IkFailed` when nothing
-    converges (target out of reach) or the solution breaks a joint limit.
+    Levenberg-Marquardt descent from a structured set of seeds (see
+    :func:`_ik_seeds`), coarse-to-fine: every seed gets a short screening
+    descent, then the most promising is refined to tolerance. A converged
+    solution that breaks a joint limit does *not* stop the search -- the next
+    seed may reach an in-limit branch. This is a local solver, not a full
+    analytic IK, so a genuinely reachable pose is only rejected when no seed
+    lands within tolerance and in limits.
+
+    Raises :class:`IkFailed` when nothing converges (target out of reach) or the
+    only convergent branches break a joint limit.
+
+    The tolerance (``tol_pos_mm`` / ``tol_rot_deg``) is what "reached" means: a
+    sub-millimetre visual twin needs far less precision than a machining
+    controller, and a tight tolerance here only shrinks the apparent workspace.
     """
     if target_pose[2] < FLOOR_CLEARANCE_MM:
         raise IkFailed(
             f"target z={target_pose[2]:.0f}mm is below the floor clearance ({FLOOR_CLEARANCE_MM:.0f}mm)"
         )
     tgt_pos = (target_pose[0] / 1000.0, target_pose[1] / 1000.0, target_pose[2] / 1000.0)
+    if math.sqrt(sum(c * c for c in tgt_pos)) > _MAX_REACH_M:
+        raise IkFailed(
+            f"target unreachable (beyond the {_MAX_REACH_M * 1000:.0f} mm reach envelope)"
+        )
     tgt_rot = _rpy_matrix(*(math.radians(v) for v in target_pose[3:6]))
     tcp_z = tcp_offset_mm / 1000.0
 
-    def _wrap(a: float) -> float:
-        return math.atan2(math.sin(a), math.cos(a))
+    def _within(pm: float, rd: float) -> bool:
+        return pm < tol_pos_mm and rd < tol_rot_deg
 
-    az = math.atan2(target_pose[1], target_pose[0])
-    r45, r90 = math.radians(45.0), math.radians(90.0)
-    seeds = [[math.radians(v) for v in seed_deg]]
-    for base in (az, _wrap(az + math.pi)):
-        seeds += [
-            [_wrap(base), 0.0, -r90, 0.0, -r90, 0.0],
-            [_wrap(base), r45, r90, 0.0, r45, 0.0],
-            [_wrap(base), -r45, -r90, 0.0, -r45, 0.0],
-        ]
+    # The best few in-limit descents (by task score) to refine, the nearest
+    # descent of any branch as a fallback start, and the first in-tolerance
+    # solution that broke a limit (for the error message).
+    top_ok: list[tuple[float, list[float]]] = []  # (score, q_rad), ascending
+    closest: tuple[list[float], float, float] | None = None
+    limited_joint: int | None = None
 
-    best: tuple[list[float], float, float] | None = None
-    for seed in seeds:
-        q, pos_mm, rot_deg = _solve_from_seed(seed, tgt_pos, tgt_rot, tcp_z, max_iters)
-        if pos_mm < tol_pos_mm and rot_deg < tol_rot_deg:
-            best = (q, pos_mm, rot_deg)
+    def _consider(q_rad: list[float], pm: float, rd: float) -> list[float] | None:
+        nonlocal closest, limited_joint
+        q_deg = [math.degrees(v) for v in q_rad]
+        bad = _in_limits(q_deg)  # wraps q_deg into range where it can
+        if _within(pm, rd) and bad is None:
+            return q_deg
+        if _within(pm, rd) and limited_joint is None:
+            limited_joint = bad
+        s = _score(pm, rd)
+        if closest is None or s < _score(closest[1], closest[2]):
+            closest = (q_rad, pm, rd)
+        if bad is None:
+            top_ok.append((s, q_rad))
+            top_ok.sort(key=lambda t: t[0])
+            del top_ok[3:]
+        return None
+
+    all_seeds = _ik_seeds(seed_deg, target_pose)
+
+    # The caller's seed (an incremental target move, or a warm compile step) is
+    # by far the most likely basin -- give it the full iteration budget first.
+    got = _consider(*_solve_from_seed(all_seeds[0], tgt_pos, tgt_rot, tcp_z, max_iters))
+    if got is not None:
+        return got
+
+    # Screening pass: a short descent from every other seed. Stop early once one
+    # lands close on an in-limit branch -- refinement will finish it -- so a
+    # solvable target does not pay for the whole seed sweep.
+    for seed in all_seeds[1:]:
+        got = _consider(*_solve_from_seed(seed, tgt_pos, tgt_rot, tcp_z, 45))
+        if got is not None:
+            return got
+        if top_ok and top_ok[0][0] < 15.0:  # ~1.5 mm / 0.4° in score units
             break
-        if best is None or pos_mm + rot_deg < best[1] + best[2]:
-            best = (q, pos_mm, rot_deg)
 
-    assert best is not None
-    q, pos_mm, rot_deg = best
-    if pos_mm >= tol_pos_mm or rot_deg >= tol_rot_deg:
-        raise IkFailed(
-            f"target unreachable (closest solution is {pos_mm:.0f} mm / {rot_deg:.0f}° off)"
-        )
+    # Refinement pass: the best in-limit screened starts, then the nearest of any.
+    starts = [q for _, q in top_ok]
+    if closest is not None:
+        starts.append(closest[0])
+    for start in starts:
+        got = _consider(*_solve_from_seed(start, tgt_pos, tgt_rot, tcp_z, max_iters))
+        if got is not None:
+            return got
 
-    q_deg = [math.degrees(v) for v in q]
-    for i, (v, lim) in enumerate(zip(q_deg, JOINT_LIMITS_DEG)):
-        if abs(v) > lim + 1e-6:
-            raise IkFailed(f"solution exceeds joint {i + 1} limit (±{lim:.0f}°)")
-    return q_deg
+    if limited_joint is not None:
+        raise IkFailed(f"solution exceeds joint {limited_joint + 1} limit")
+    assert closest is not None
+    _, pm, rd = closest
+    raise IkFailed(f"target unreachable (closest solution is {pm:.0f} mm / {rd:.0f}° off)")
 
 
 def _det6(m: list[list[float]]) -> float:
