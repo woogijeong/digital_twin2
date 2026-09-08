@@ -13,6 +13,8 @@ interface Props {
   simulation?: boolean | null
   /** Called with the fresh health after a connect / disconnect. */
   onHealthChange: (h: Health) => void
+  /** Fire an emergency stop: halt controller motion and freeze the twin. */
+  onEmergencyStop: () => Promise<void>
   theme: 'dark' | 'light'
   onToggleTheme: () => void
   viewportTheme: ViewportTheme
@@ -25,6 +27,7 @@ export default function StatusBar({
   linkLost,
   simulation,
   onHealthChange,
+  onEmergencyStop,
   theme,
   onToggleTheme,
   viewportTheme,
@@ -37,6 +40,20 @@ export default function StatusBar({
   const [hostEdit, setHostEdit] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const [estopBusy, setEstopBusy] = useState(false)
+  const [estopErr, setEstopErr] = useState<string | null>(null)
+
+  const triggerEstop = async () => {
+    setEstopBusy(true)
+    setEstopErr(null)
+    try {
+      await onEmergencyStop()
+    } catch (e) {
+      setEstopErr(e instanceof ApiError ? e.detail : 'e-stop failed')
+    } finally {
+      setEstopBusy(false)
+    }
+  }
 
   const host = hostEdit ?? health?.host ?? ''
 
@@ -59,9 +76,18 @@ export default function StatusBar({
 
   return (
     <header style={header}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
         <span style={dot} />
         <span style={brand}>INDY7 · DIGITAL TWIN</span>
+        <button
+          onClick={triggerEstop}
+          disabled={estopBusy}
+          title={estopErr ?? 'emergency stop — halt all controller motion now'}
+          style={{ ...estopBtn, ...(estopErr ? estopBtnErr : null) }}
+        >
+          {estopBusy ? 'STOPPING…' : '■ E-STOP'}
+        </button>
+        {estopErr && <span style={errText}>{estopErr}</span>}
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 12 }}>
@@ -207,6 +233,22 @@ const connBtnGo: CSSProperties = {
 const connBtnErr: CSSProperties = {
   border: `1px solid ${T.amber}`,
   color: T.amber,
+}
+const estopBtn: CSSProperties = {
+  background: T.red,
+  border: `1px solid ${T.red}`,
+  color: T.onRed,
+  borderRadius: 6,
+  padding: '6px 14px',
+  fontFamily: T.fontMono,
+  fontWeight: 700,
+  fontSize: 11,
+  letterSpacing: '0.14em',
+  cursor: 'pointer',
+}
+const estopBtnErr: CSSProperties = {
+  background: 'transparent',
+  color: T.red,
 }
 const errText: CSSProperties = {
   fontFamily: T.fontMono,

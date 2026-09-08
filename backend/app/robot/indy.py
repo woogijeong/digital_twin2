@@ -3,9 +3,11 @@
 Wraps the synchronous ``neuromeka`` gRPC client. Every SDK call is pushed to a
 worker thread so the event loop is never blocked. Connecting never changes the
 controller's state (it does not touch ``set_simulation_mode``): P0 mirrors and
-solves kinematics but never commands real motion, enforced by the ``_call``
-allow-list. Whatever mode the controller is actually in is reported back in the
-telemetry frame (``simulation``) and shown in the header.
+solves kinematics but never commands a real *move*, enforced by the ``_call``
+allow-list. The sole exception is ``emergency_stop`` -- an operator safety
+control that halts motion (``stop_motion``); it stops a move, never starts one.
+Whatever mode the controller is actually in is reported back in the telemetry
+frame (``simulation``) and shown in the header.
 """
 
 from __future__ import annotations
@@ -27,15 +29,17 @@ from app.schemas import PoseDTO, TelemetryFrame
 
 log = logging.getLogger("indy_twin.robot")
 
-# P0 is read + kinematics + the TCP tool frame + fault recovery. Every SDK
-# call goes through ``_call`` and only these may pass -- so no code path (or
-# future edit) can command physical motion (``movej`` / ``movel`` / teleop),
-# whatever string it hands to ``_call``. ``set_tool_frame`` is a TCP-reference
-# config, not motion; ``recover`` only clears a fault flag (e.g. after a
-# collision stop) -- it does not move the robot either; ``set_do`` toggles
-# end-effector I/O (the gripper/suction solenoids) -- it actuates the *tool*,
-# not the arm, so it's not motion either. ``get_do`` is a read of those same
-# digital outputs -- so the twin can mirror the live gripper / suction state.
+# P0 is read + kinematics + the TCP tool frame + fault recovery + an emergency
+# stop. Every SDK call goes through ``_call`` and only these may pass -- so no
+# code path (or future edit) can command a physical *move* (``movej`` /
+# ``movel`` / teleop), whatever string it hands to ``_call``. ``set_tool_frame``
+# is a TCP-reference config, not motion; ``recover`` only clears a fault flag
+# (e.g. after a collision stop) -- it does not move the robot either; ``set_do``
+# toggles end-effector I/O (the gripper/suction solenoids) -- it actuates the
+# *tool*, not the arm, so it's not motion either. ``get_do`` is a read of those
+# same digital outputs -- so the twin can mirror the live gripper / suction
+# state. ``stop_motion`` is the deliberate exception: it *halts* motion for an
+# operator emergency stop -- it stops a move, it can never start one.
 # ``set_simulation_mode`` is deliberately absent: connecting must not change
 # the controller's operating mode -- the twin observes whatever mode it finds.
 _ALLOWED_SDK_CALLS = frozenset(
@@ -48,12 +52,20 @@ _ALLOWED_SDK_CALLS = frozenset(
         "set_tool_frame",
         "recover",
         "set_do",
+        "stop_motion",
     }
 )
 
 # Digital-output addresses the twin drives (see ``set_gripper`` / ``set_suction``).
 _DO_GRIPPER_OPEN = 0  # DO0 HIGH = gripper open
+_DO_GRIPPER_CLOSE = 1  # DO1 HIGH = gripper close (latching pair with DO0)
 _DO_SUCTION = 2  # DO2 HIGH = suction on
+
+# neuromeka StopCategory for ``stop_motion``: 0 = IMMEDIATE_BRAKE, 1 = SMOOTH_BRAKE
+# (controlled decel then brake), 2 = SMOOTH_ONLY. The E-STOP button uses a
+# category-1 stop. Spelled as a literal so the module never has to import the
+# SDK's proto enums just to name a constant.
+_STOP_CATEGORY_SMOOTH_BRAKE = 1
 _DO_STATE_ON = 1  # neuromeka DigitalState: 0 = OFF, 1 = ON, 2 = UNUSED
 
 # How often to poll digital outputs while streaming (s). Gripper/suction state
@@ -174,13 +186,26 @@ class IndyDCP3Robot(RobotService):
 
     async def set_gripper(self, open: bool) -> None:
         # DO0/DO1 are a latching dual-solenoid pair -- exactly one is HIGH.
-        await self._call("set_do", [(0, open), (1, not open)])
+        await self._call("set_do", [(_DO_GRIPPER_OPEN, open), (_DO_GRIPPER_CLOSE, not open)])
 
     async def set_suction(self, on: bool) -> None:
-        await self._call("set_do", [(2, on)])
+        await self._call("set_do", [(_DO_SUCTION, on)])
+
+    async def set_all_do_off(self) -> None:
+        # De-energise every end-effector output in one write: both gripper
+        # solenoids and the suction valve go LOW.
+        await self._call(
+            "set_do",
+            [(_DO_GRIPPER_OPEN, False), (_DO_GRIPPER_CLOSE, False), (_DO_SUCTION, False)],
+        )
 
     async def recover(self) -> None:
         await self._call("recover")
+
+    async def emergency_stop(self) -> None:
+        # Category-1 stop (SMOOTH_BRAKE): controlled decel, then brake. The twin's
+        # one motion-affecting command -- it stops the arm, it never moves it.
+        await self._call("stop_motion", _STOP_CATEGORY_SMOOTH_BRAKE)
 
     async def _redial(self) -> None:
         """Best-effort reconnect of a dropped gRPC channel. Silent on failure --

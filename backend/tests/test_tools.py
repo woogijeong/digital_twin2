@@ -76,3 +76,19 @@ def test_gripper_and_suction_toggle_the_right_digital_outputs(client, monkeypatc
 
     assert client.post("/api/suction", json={"on": True}).status_code == 200
     indy.set_do.assert_called_with([(2, True)])
+
+    assert client.post("/api/do/all-off").status_code == 200
+    indy.set_do.assert_called_with([(0, False), (1, False), (2, False)])
+
+
+def test_estop_halts_the_controller(client, monkeypatch):
+    indy = MagicMock()
+    indy.get_control_data.return_value = {"q": [0.0] * 6, "p": [0.0] * 6, "op_state": 5}
+    indy.get_control_state.return_value = {"manipulability": 0.5}
+    module = MagicMock()
+    module.IndyDCP3.return_value = indy
+    monkeypatch.setitem(sys.modules, "neuromeka", module)
+    assert client.post("/api/connect", json={"host": "10.0.0.9"}).status_code == 200
+
+    assert client.post("/api/estop").status_code == 200
+    indy.stop_motion.assert_called_once_with(1)  # StopCategory.CAT1 / SMOOTH_BRAKE

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import asyncio
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -161,7 +162,37 @@ async def test_mock_gripper_and_suction_are_harmless_no_ops():
     await robot.set_gripper(False)
     await robot.set_suction(True)
     await robot.set_suction(False)
+    await robot.set_all_do_off()
     # no exception means success -- the mock has no physical I/O to check
+
+
+async def test_indy_set_all_do_off_drives_every_tool_output_low():
+    robot = IndyDCP3Robot("10.0.0.9")
+    robot._indy = _fake_indy()
+    robot._connected = True
+    await robot.set_all_do_off()
+    robot._indy.set_do.assert_called_once_with([(0, False), (1, False), (2, False)])
+
+
+async def test_indy_emergency_stop_issues_a_category_1_stop():
+    robot = IndyDCP3Robot("10.0.0.9")
+    robot._indy = _fake_indy()
+    robot._connected = True
+    await robot.emergency_stop()
+    robot._indy.stop_motion.assert_called_once_with(1)  # StopCategory.CAT1 / SMOOTH_BRAKE
+    # e-stop halts a move; it must never issue one
+    robot._indy.movej.assert_not_called()
+    robot._indy.movel.assert_not_called()
+
+
+async def test_mock_emergency_stop_freezes_the_arm_in_place():
+    robot = MockRobot()
+    await robot.connect()
+    await robot.solve_ik([400, 0, 400, 180, 0, 0], [0] * 6)  # start an eased move
+    await robot.emergency_stop()
+    frozen = await robot.get_joints()
+    await asyncio.sleep(0.05)
+    assert await robot.get_joints() == pytest.approx(frozen)
 
 
 async def test_mock_ik_rejects_unreachable():
@@ -225,6 +256,9 @@ async def test_call_rejects_non_allowlisted_sdk_method():
     robot._indy.get_control_data.assert_called_once()
     await robot._call("set_tool_frame", [0, 0, 60, 0, 0, 0])
     robot._indy.set_tool_frame.assert_called_once()
+    # stop_motion is allow-listed: it halts motion for an operator e-stop
+    await robot._call("stop_motion", 1)
+    robot._indy.stop_motion.assert_called_once()
 
 
 def test_no_motion_commands_in_p0_code():

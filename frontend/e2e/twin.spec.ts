@@ -237,6 +237,27 @@ test('closing the gripper on the workpiece picks it up, opening releases it', as
   await expect(badge).toBeHidden()
 })
 
+test('E-STOP halts an in-progress move', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.getByText('LINKED')).toBeVisible({ timeout: 10_000 })
+
+  const jointRow = () =>
+    page.locator('aside span').filter({ hasText: /^-?\d+\.\d$/ }).allTextContents()
+
+  // Kick off a long eased move, then slam E-STOP partway through.
+  const inputs = page.locator('aside input')
+  for (const [i, v] of [420, -120, 300, 178, 2, -60].entries()) await inputs.nth(i).fill(String(v))
+  await page.getByRole('button', { name: 'APPLY TARGET' }).click()
+  await page.waitForTimeout(300)
+  await page.getByRole('button', { name: 'E-STOP' }).click()
+
+  // Whatever it was showing right after the stop, it stays there — no drift.
+  await page.waitForTimeout(150)
+  const stopped = await jointRow()
+  await page.waitForTimeout(900)
+  expect(await jointRow()).toEqual(stopped)
+})
+
 test('theme toggle switches the UI between dark and light', async ({ page }) => {
   await page.goto('/')
   await expect(page.getByText('LINKED')).toBeVisible({ timeout: 10_000 })
@@ -303,6 +324,27 @@ test('suction has an ON/OFF toggle independent of the gripper', async ({ page })
 
   await page.getByRole('button', { name: 'NONE', exact: true }).click()
   await expect(onBtn).toBeHidden()
+})
+
+test('ALL DO OFF clears every end-effector output', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.getByText('LINKED')).toBeVisible({ timeout: 10_000 })
+
+  await page.getByRole('button', { name: 'SUCTION', exact: true }).click()
+  const onBtn = page.getByRole('button', { name: 'ON', exact: true })
+  const offBtn = page.getByRole('button', { name: 'OFF', exact: true })
+  await onBtn.click()
+  await expect(onBtn).toHaveAttribute('aria-pressed', 'true')
+
+  await page.getByRole('button', { name: 'ALL DO OFF' }).click()
+  await expect(offBtn).toHaveAttribute('aria-pressed', 'true')
+
+  // and the gripper solenoids read closed afterwards
+  await page.getByRole('button', { name: 'GRIPPER', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'CLOSE', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
 })
 
 test('a target below the floor is rejected before the arm moves', async ({ page }) => {

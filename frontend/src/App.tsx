@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { T } from './theme'
 import {
+  allDoOff,
+  emergencyStop,
   getHealth,
   setGripperDo,
   setSuctionDo,
@@ -33,7 +35,7 @@ export default function App() {
   const { theme, toggleTheme } = useTheme()
   const { viewportTheme, toggleViewportTheme } = useViewportTheme()
   const { frame, link, stale } = useTelemetry()
-  const { jointsDeg, animateTo } = useJointAnimation(frame?.q ?? null)
+  const { jointsDeg, animateTo, stopAnimation } = useJointAnimation(frame?.q ?? null)
 
   const linkLost = frame?.link_ok === false
   // A sim-mode controller with no physical arm attached reports this as its
@@ -81,6 +83,25 @@ export default function App() {
     })
   }
 
+  // Emergency stop: freeze the rendered twin immediately (cancel any in-flight
+  // IK animation), then command the controller to halt. Freezing first means
+  // the arm stops on screen the instant the button is pressed, even before the
+  // round-trip completes.
+  const emergencyStopTwin = () => {
+    stopAnimation()
+    return emergencyStop()
+  }
+
+  // Panic reset for the end-effector I/O: drive every digital output the twin
+  // controls LOW (gripper solenoids + suction) and clear the local visual state.
+  const turnAllDoOff = () => {
+    setGripperOpenLocal(false)
+    setSuctionOnLocal(false)
+    allDoOff().catch(() => {
+      /* mock ignores it; a real controller failure shouldn't revert the visual reset */
+    })
+  }
+
   return (
     <div
       style={{
@@ -97,6 +118,7 @@ export default function App() {
         linkLost={linkLost}
         simulation={frame?.simulation}
         onHealthChange={setHealth}
+        onEmergencyStop={emergencyStopTwin}
         theme={theme}
         onToggleTheme={toggleTheme}
         viewportTheme={viewportTheme}
@@ -173,6 +195,7 @@ export default function App() {
             onSuctionToggle={toggleSuction}
             suctionColor={suctionColor}
             onSuctionColorChange={setSuctionColor}
+            onAllDoOff={turnAllDoOff}
           />
           <JointBars q={jointsDeg} warnJoints={warnJoints} />
           <div

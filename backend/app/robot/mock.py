@@ -91,8 +91,17 @@ class MockRobot(RobotService):
     async def set_suction(self, on: bool) -> None:
         pass
 
+    async def set_all_do_off(self) -> None:
+        pass  # no physical I/O; the frontend resets its own visual state
+
     async def recover(self) -> None:
         pass  # the mock has no fault state to clear
+
+    async def emergency_stop(self) -> None:
+        # No physical arm to halt -- freeze the eased move wherever it is now.
+        self._from = self._joints_now()
+        self._target = list(self._from)
+        self._move_start = time.monotonic()
 
     async def solve_ik(self, tpos: list[float], init_jpos: list[float]) -> list[float]:
         # Real numerical IK against the URDF model; raises IkFailed when the

@@ -168,3 +168,22 @@ async def gripper(request: Request, body: GripperRequest) -> dict:
 async def suction(request: Request, body: SuctionRequest) -> dict:
     await _robot(request).set_suction(body.on)
     return {"status": "ok", "on": body.on}
+
+
+@router.post("/do/all-off")
+async def all_do_off(request: Request) -> dict:
+    """Drive every end-effector digital output LOW (gripper solenoids + suction)."""
+    await _robot(request).set_all_do_off()
+    return {"status": "ok"}
+
+
+@router.post("/estop")
+async def estop(request: Request) -> dict:
+    """Emergency stop: command the controller to halt all motion immediately."""
+    try:
+        await _robot(request).emergency_stop()
+    except RobotUnavailable as exc:
+        raise HTTPException(
+            status_code=502, detail={"error": "estop_failed", "detail": str(exc)}
+        ) from exc
+    return {"status": "ok"}

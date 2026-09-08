@@ -21,6 +21,14 @@ export function useJointAnimation(telemetryQ: number[] | null) {
     }
   }, [telemetryQ])
 
+  /** Halt any in-progress IK move and freeze the rendered joints where they
+   *  are, handing control back to live telemetry. Used by the E-STOP button. */
+  const stopAnimation = useCallback(() => {
+    activeTween.current?.cancel()
+    activeTween.current = null
+    tweening.current = false
+  }, [])
+
   const animateTo = useCallback((targetJpos: number[], durationMs = 1000) => {
     activeTween.current?.cancel()
     tweening.current = true
@@ -47,5 +55,5 @@ export function useJointAnimation(telemetryQ: number[] | null) {
 
   useEffect(() => () => activeTween.current?.cancel(), [])
 
-  return { jointsDeg, animateTo }
+  return { jointsDeg, animateTo, stopAnimation }
 }

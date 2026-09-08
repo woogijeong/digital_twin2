@@ -15,6 +15,7 @@ interface Props {
   onSuctionToggle: (on: boolean) => void
   suctionColor: string
   onSuctionColorChange: (hex: string) => void
+  onAllDoOff: () => void
 }
 
 const TOOLS: Array<{ id: ToolId; label: string }> = [
@@ -35,6 +36,7 @@ export default function ToolPanel({
   onSuctionToggle,
   suctionColor,
   onSuctionColorChange,
+  onAllDoOff,
 }: Props) {
   return (
     <section>
@@ -104,6 +106,13 @@ export default function ToolPanel({
           </div>
         </>
       )}
+      <button
+        onClick={onAllDoOff}
+        title="drive every end-effector digital output LOW (gripper solenoids + suction)"
+        style={allOffBtn}
+      >
+        ALL DO OFF
+      </button>
     </section>
   )
 }
@@ -137,6 +146,19 @@ const colorLabel: CSSProperties = {
   fontSize: 9.5,
   color: T.muted,
   letterSpacing: '0.1em',
+}
+const allOffBtn: CSSProperties = {
+  width: '100%',
+  marginTop: 10,
+  padding: '7px 0',
+  background: 'transparent',
+  border: `1px solid ${T.amber}`,
+  borderRadius: 6,
+  color: T.amber,
+  fontFamily: T.fontMono,
+  fontSize: 10,
+  letterSpacing: '0.12em',
+  cursor: 'pointer',
 }
 const colorInput: CSSProperties = {
   width: 40,

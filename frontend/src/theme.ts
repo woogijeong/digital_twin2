@@ -11,6 +11,9 @@ export const T = {
   tealTrack: 'var(--twin-teal-track)',
   amber: 'var(--twin-amber)',
   green: 'var(--twin-green)',
+  red: 'var(--twin-red)',
+  onRed: 'var(--twin-on-red)', // text on a red fill
+
   badgeBorderSim: 'var(--twin-badge-sim)',
   badgeBorderMock: 'var(--twin-badge-mock)',
   hint: 'var(--twin-hint)',
